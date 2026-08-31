@@ -1,0 +1,2 @@
+import Link from "next/link"; import { Header } from "@/components/Header"; import { WorkshopClosures } from "@/components/WorkshopClosures";
+export default function Calendar(){return <><Header/><main className="page"><div className="shell" style={{maxWidth:850}}><Link href="/officina">← Dashboard officina</Link><div className="eyebrow" style={{marginTop:24}}>Disponibilità</div><h1 style={{fontSize:44}}>Calendario e chiusure</h1><p className="lead">Registra ferie e indisponibilità: le fasce verranno escluse dalle nuove prenotazioni.</p><WorkshopClosures/></div></main></>}
