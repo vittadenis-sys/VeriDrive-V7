@@ -145,3 +145,14 @@ create policy "workshops manage photos" on public.photos for all using (inspecti
 create policy "workshops read payouts" on public.payouts for select using (public.is_workshop_owner(workshop_id));
 create policy "workshops read closures" on public.workshop_closures for select using (public.is_workshop_owner(workshop_id));
 create policy "workshops manage closures" on public.workshop_closures for all using (public.is_workshop_owner(workshop_id));
+
+-- Create the customer profile automatically after Supabase Auth registration.
+create or replace function public.create_customer_profile()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.customers (auth_id, full_name)
+  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)));
+  return new;
+end; $$;
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.create_customer_profile();
