@@ -1,7 +1,16 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createServiceClient } from "@/lib/supabase/service";
+import { createClient } from "@supabase/supabase-js";
+
+function createServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) throw new Error("Supabase service role non configurato");
+  return createClient(url, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
 
 export async function POST(request: Request) {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
@@ -29,7 +38,7 @@ export async function POST(request: Request) {
 
     if (bookingId && session.payment_status === "paid") {
       const supabase = createServiceClient();
-      await supabase
+      const { error } = await supabase
         .from("bookings")
         .update({
           status: "confirmed",
@@ -38,6 +47,11 @@ export async function POST(request: Request) {
             typeof session.payment_intent === "string" ? session.payment_intent : null,
         })
         .eq("id", bookingId);
+
+      if (error) {
+        console.error("Stripe webhook booking update failed", error);
+        return NextResponse.json({ error: "Impossibile aggiornare la prenotazione" }, { status: 500 });
+      }
     }
   }
 
