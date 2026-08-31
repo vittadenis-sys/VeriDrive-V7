@@ -24,7 +24,7 @@ Apri [http://localhost:3000](http://localhost:3000).
 
 ## Configurazione
 
-Compila in `.env.local` le variabili Supabase e, per i pagamenti test, `STRIPE_SECRET_KEY`.
+Compila in `.env.local` le variabili Supabase, Stripe test (`STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET`) e Resend (`RESEND_API_KEY`) per le email automatiche.
 Lo script SQL in `supabase/schema.sql` crea le tabelle principali. Il checkout è esposto da `POST /api/checkout`.
 
 ## Struttura
