@@ -7,6 +7,8 @@ export async function updateSession(request: NextRequest) {
     cookies: { getAll: () => request.cookies.getAll(), setAll: (items) => { items.forEach(({name,value}) => request.cookies.set(name,value)); response = NextResponse.next({request}); items.forEach(({name,value,options}) => response.cookies.set(name,value,options)); } }
   });
   const { data:{ user } } = await supabase.auth.getUser();
-  if (!user && request.nextUrl.pathname.startsWith("/dashboard")) return NextResponse.redirect(new URL("/login", request.url));
+  const path=request.nextUrl.pathname;
+  const protectedArea=path.startsWith("/dashboard")||path.startsWith("/officina")||path.startsWith("/admin");
+  if (!user && protectedArea) { const login=new URL("/login",request.url); login.searchParams.set("next",path); return NextResponse.redirect(login); }
   return response;
 }
