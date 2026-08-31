@@ -1,0 +1,2 @@
+import type { MetadataRoute } from "next";
+export default function manifest(): MetadataRoute.Manifest { return { name:"VeriDrive", short_name:"VeriDrive", description:"Verifiche auto certificate", start_url:"/", display:"standalone", background_color:"#f4f7fb", theme_color:"#1479f7", icons:[] }; }
