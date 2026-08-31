@@ -1,0 +1,2 @@
+import Link from "next/link";
+export function Header(){return <header><div className="shell nav"><Link href="/" className="logo">veri<span>drive</span></Link><nav><Link href="/#come-funziona">Come funziona</Link><Link href="/officina">Per le officine</Link><Link href="/dashboard">Area clienti</Link></nav><Link className="button" href="/prenota">Prenota una verifica</Link></div></header>}
