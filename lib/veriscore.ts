@@ -1,0 +1,2 @@
+export function calculateVeriscore(values: boolean[]) { const completed=values.filter(Boolean).length; return Math.round((completed / 50) * 100); }
+export function scoreLabel(score:number){return score>=90?"Eccellente":score>=75?"Affidabile":score>=55?"Da valutare":"Critico";}
