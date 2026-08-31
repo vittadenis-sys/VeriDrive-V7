@@ -1,0 +1,3 @@
+"use client";
+import { jsPDF } from "jspdf"; import QRCode from "qrcode";
+export function ReportDownloadButton(){async function download(){const pdf=new jsPDF();pdf.setFontSize(22);pdf.text("VeriDrive — Report certificato",20,24);pdf.setFontSize(14);pdf.text("Volkswagen Golf 1.5 TSI",20,38);pdf.text("VERISCORE: 92/100",20,49);pdf.setFontSize(11);pdf.text("Verifica completata il 25 agosto 2026.",20,62);pdf.text("Codice report: VD-2026-0042",20,70);const qr=await QRCode.toDataURL(location.origin+"/verify/VD-2026-0042");pdf.addImage(qr,"PNG",20,82,45,45);pdf.text("Scansiona il QR per verificare l’autenticità del certificato.",20,137);pdf.save("veridrive-VD-2026-0042.pdf");}return <button className="button" onClick={download}>Scarica PDF</button>}
