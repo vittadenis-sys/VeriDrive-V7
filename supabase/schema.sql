@@ -156,3 +156,9 @@ begin
 end; $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.create_customer_profile();
+
+
+-- Private photo bucket; uploads are restricted to authenticated operators.
+insert into storage.buckets (id, name, public) values ('inspection-photos','inspection-photos',false) on conflict (id) do nothing;
+create policy "authenticated upload inspection photos" on storage.objects for insert to authenticated with check (bucket_id = 'inspection-photos');
+create policy "authenticated read inspection photos" on storage.objects for select to authenticated using (bucket_id = 'inspection-photos');
