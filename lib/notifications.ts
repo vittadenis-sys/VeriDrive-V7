@@ -1,0 +1,2 @@
+import { Resend } from "resend";
+export async function sendBookingConfirmation(to:string, bookingId:string){if(!process.env.RESEND_API_KEY)return {sent:false,reason:"RESEND_API_KEY non configurata"};const resend=new Resend(process.env.RESEND_API_KEY);await resend.emails.send({from:process.env.EMAIL_FROM ?? "VeriDrive <onboarding@resend.dev>",to,subject:"Abbiamo ricevuto la tua richiesta VeriDrive",html:"<h1>Prenotazione ricevuta</h1><p>Codice pratica: <b>"+bookingId+"</b></p>"});return {sent:true};}
