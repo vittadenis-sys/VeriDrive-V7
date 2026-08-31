@@ -162,3 +162,5 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
 insert into storage.buckets (id, name, public) values ('inspection-photos','inspection-photos',false) on conflict (id) do nothing;
 create policy "authenticated upload inspection photos" on storage.objects for insert to authenticated with check (bucket_id = 'inspection-photos');
 create policy "authenticated read inspection photos" on storage.objects for select to authenticated using (bucket_id = 'inspection-photos');
+
+create policy "authenticated create workshop" on public.workshops for insert to authenticated with check (owner_auth_id = auth.uid());
