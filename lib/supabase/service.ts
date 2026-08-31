@@ -1,0 +1,2 @@
+import { createClient } from "@supabase/supabase-js";
+export function createServiceClient(){if(!process.env.NEXT_PUBLIC_SUPABASE_URL||!process.env.SUPABASE_SERVICE_ROLE_KEY)throw new Error("Configura SUPABASE_SERVICE_ROLE_KEY");return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}});}
