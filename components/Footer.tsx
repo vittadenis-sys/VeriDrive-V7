@@ -1,1 +1,1 @@
-export function Footer(){return <footer><div className="shell"><strong>veridrive</strong><p>Verifiche auto certificate, per acquistare e vendere con più fiducia.</p><small>© 2026 VeriDrive. Tutti i diritti riservati.</small></div></footer>
+export function Footer(){return <footer><div className="shell"><strong>veridrive</strong><p>Verifiche auto certificate, per acquistare e vendere con più fiducia.</p><small>© 2026 VeriDrive. Tutti i diritti riservati.</small></div></footer>;}
