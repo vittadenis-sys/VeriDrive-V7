@@ -1,0 +1,2 @@
+import Link from "next/link"; import { Header } from "@/components/Header"; import { PhotoUploader } from "@/components/PhotoUploader";
+export default function Foto(){return <><Header/><main className="page"><div className="shell" style={{maxWidth:850}}><Link href="/officina">← Dashboard officina</Link><div className="eyebrow" style={{marginTop:24}}>Documentazione</div><h1 style={{fontSize:44}}>Galleria dell’ispezione</h1><PhotoUploader/></div></main></>}
