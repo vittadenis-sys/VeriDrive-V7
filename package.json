@@ -16,7 +16,9 @@
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "stripe": "^17.5.0"
+    "stripe": "^17.5.0",
+    "jspdf": "^2.5.2",
+    "resend": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
