@@ -1,0 +1,2 @@
+import Link from "next/link"; import { Header } from "@/components/Header"; import { WorkshopSignup } from "@/components/WorkshopSignup";
+export default function WorkshopRegister(){return <><Header/><main className="page"><div className="shell" style={{maxWidth:850}}><Link href="/officina">← Area officina</Link><div className="eyebrow" style={{marginTop:24}}>Diventa partner</div><h1 style={{fontSize:44}}>Candidatura officina</h1><p className="lead">Dopo la verifica amministrativa potrai ricevere incarichi nella tua zona.</p><WorkshopSignup/></div></main></>}
