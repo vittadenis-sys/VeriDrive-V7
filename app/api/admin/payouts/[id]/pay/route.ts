@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server"; import { requireAdmin } from "@/lib/authorization"; import { createServiceClient } from "@/lib/supabase/service";
+export async function PATCH(_:Request,{params}:{params:Promise<{id:string}>}){try{await requireAdmin();const {id}=await params;const {error}=await createServiceClient().from("payouts").update({status:"paid",paid_at:new Date().toISOString()}).eq("id",id);if(error)throw error;return NextResponse.json({ok:true});}catch{return NextResponse.json({error:"Non autorizzato"},{status:401});}}
