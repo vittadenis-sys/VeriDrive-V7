@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CarFront, ShieldCheck, SearchCheck, ArrowRight } from "lucide-react";
+import { CarFront, SearchCheck, ArrowRight } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
