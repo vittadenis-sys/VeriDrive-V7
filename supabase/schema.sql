@@ -39,10 +39,12 @@ create table if not exists public.bookings (
   requested_date date,
   requested_slot text,
   status public.booking_status not null default 'requested',
-  customer_price_cents integer not null default 9900 check (customer_price_cents = 9900),
-  service_key text not null default 'plus',
+  customer_price_cents integer not null default 9900 check (customer_price_cents in (3900,4900,9900,13900)),
+  service_key text not null default 'base',
   listing_url text,
   location text,
+  urgency boolean not null default false,
+  urgency_price_cents integer not null default 0 check (urgency_price_cents in (0,2500)),
   reschedule_count integer not null default 0 check (reschedule_count between 0 and 1),
   rescheduled_at timestamptz,
   stripe_checkout_session_id text unique,
@@ -51,15 +53,17 @@ create table if not exists public.bookings (
   updated_at timestamptz not null default now()
 );
 
--- For an already-created database, migrate the legacy booking fields safely.
-alter table public.bookings add column if not exists service_key text not null default 'plus';
+-- For an already-created database, migrate the booking fields safely.
+alter table public.bookings add column if not exists service_key text not null default 'base';
 alter table public.bookings add column if not exists listing_url text;
 alter table public.bookings add column if not exists location text;
+alter table public.bookings add column if not exists urgency boolean not null default false;
+alter table public.bookings add column if not exists urgency_price_cents integer not null default 0;
 alter table public.bookings add column if not exists reschedule_count integer not null default 0;
 alter table public.bookings add column if not exists rescheduled_at timestamptz;
 alter table public.bookings alter column customer_price_cents set default 9900;
 alter table public.bookings drop constraint if exists bookings_customer_price_cents_check;
-alter table public.bookings add constraint bookings_customer_price_cents_check check (customer_price_cents = 9900);
+alter table public.bookings add constraint bookings_customer_price_cents_check check (customer_price_cents in (3900,4900,9900,13900));
 
 create table if not exists public.inspections (
   id uuid primary key default gen_random_uuid(),
@@ -96,7 +100,7 @@ create table if not exists public.payouts (
   id uuid primary key default gen_random_uuid(),
   workshop_id uuid not null references public.workshops(id) on delete restrict,
   booking_id uuid unique not null references public.bookings(id) on delete restrict,
-  amount_cents integer not null default 5500 check (amount_cents = 5500),
+  amount_cents integer not null default 6000 check (amount_cents >= 0),
   status public.payout_status not null default 'pending',
   paid_at timestamptz,
   created_at timestamptz not null default now()
@@ -109,6 +113,22 @@ create table if not exists public.workshop_closures (
   ends_on date not null,
   reason text,
   check (ends_on >= starts_on)
+);
+
+create table if not exists public.workshop_schedule (
+  id uuid primary key default gen_random_uuid(),
+  workshop_id uuid not null references public.workshops(id) on delete cascade,
+  weekday integer not null check (weekday between 1 and 7),
+  slot_time text not null,
+  active boolean not null default true,
+  unique (workshop_id, weekday, slot_time)
+);
+
+create table if not exists public.workshop_settings (
+  workshop_id uuid primary key references public.workshops(id) on delete cascade,
+  max_daily_inspections integer not null default 3 check (max_daily_inspections > 0),
+  accepts_urgent boolean not null default false,
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.settings (
@@ -141,6 +161,8 @@ alter table public.certificates enable row level security;
 alter table public.photos enable row level security;
 alter table public.payouts enable row level security;
 alter table public.workshop_closures enable row level security;
+alter table public.workshop_schedule enable row level security;
+alter table public.workshop_settings enable row level security;
 alter table public.settings enable row level security;
 
 create policy "customers read self" on public.customers for select using (auth_id = auth.uid());
@@ -160,8 +182,11 @@ create policy "workshops manage photos" on public.photos for all using (inspecti
 create policy "workshops read payouts" on public.payouts for select using (public.is_workshop_owner(workshop_id));
 create policy "workshops read closures" on public.workshop_closures for select using (public.is_workshop_owner(workshop_id));
 create policy "workshops manage closures" on public.workshop_closures for all using (public.is_workshop_owner(workshop_id));
+create policy "workshops read schedule" on public.workshop_schedule for select using (public.is_workshop_owner(workshop_id));
+create policy "workshops manage schedule" on public.workshop_schedule for all using (public.is_workshop_owner(workshop_id));
+create policy "workshops read settings" on public.workshop_settings for select using (public.is_workshop_owner(workshop_id));
+create policy "workshops manage settings" on public.workshop_settings for all using (public.is_workshop_owner(workshop_id));
 
--- Create the customer profile automatically after Supabase Auth registration.
 create or replace function public.create_customer_profile()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
