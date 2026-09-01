@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CarFront, Plane, ShieldCheck, SearchCheck } from "lucide-react";
+import { CarFront, ShieldCheck, SearchCheck } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
@@ -11,9 +11,9 @@ export default function Home() {
         <section className="hero">
           <div className="shell">
             <div className="eyebrow">VeriDrive · controlli indipendenti</div>
-            <h1>La tranquillità di sapere cosa stai guidando.</h1>
+            <h1>Verifiche indipendenti. Scelte più sicure.</h1>
             <p className="lead">
-              Scegli il servizio in base alla tua esigenza. VeriDrive coordina il controllo e ti consegna un risultato chiaro e documentato.
+              Scegli il servizio in base alla tua esigenza. Ti aiutiamo a controllare la tua auto o a comprare un usato con maggiore consapevolezza.
             </p>
           </div>
         </section>
@@ -23,52 +23,51 @@ export default function Home() {
             <div className="eyebrow">Scegli la tua esigenza</div>
             <h2>Come possiamo aiutarti?</h2>
 
-            <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+            <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
               <article className="card">
                 <div className="icon"><CarFront /></div>
                 <h3>Ho già un'auto</h3>
-                <p>Controlla la tua vettura prima di un viaggio o ottieni una certificazione dello stato del veicolo.</p>
-                <div className="actions" style={{ marginTop: 20 }}>
-                  <Link className="button secondary" href="/servizi/pre-viaggio">Controllo Pre Viaggio</Link>
-                  <Link className="button secondary" href="/servizi/vericert">VeriCert</Link>
+                <p>Servizi pensati per chi possiede già una vettura e vuole partire tranquillo o certificarne lo stato.</p>
+                <div className="cards" style={{ marginTop: 20, gridTemplateColumns: "1fr" }}>
+                  <Link className="card" href="/servizi/pre-viaggio" style={{ display: "block" }}>
+                    <h4>Controllo Pre Viaggio</h4>
+                    <p>Controllo mirato prima di un viaggio lungo.</p>
+                  </Link>
+                  <Link className="card" href="/servizi/vericert" style={{ display: "block" }}>
+                    <h4>VeriCert</h4>
+                    <p>Certificazione digitale dello stato del veicolo.</p>
+                  </Link>
                 </div>
               </article>
 
               <article className="card">
                 <div className="icon"><SearchCheck /></div>
                 <h3>Devo acquistare un'auto usata</h3>
-                <p>Tre livelli di verifica indipendente per aiutarti a scegliere con più sicurezza.</p>
-                <div className="actions" style={{ marginTop: 20 }}>
-                  <Link className="button secondary" href="/prenota?service=entry">Livello 1</Link>
-                  <Link className="button" href="/prenota?service=99">Livello 2 · €99</Link>
-                  <Link className="button secondary" href="/prenota?service=premium">Livello 3</Link>
-                </div>
-              </article>
-
-              <article className="card">
-                <div className="icon"><Plane /></div>
-                <h3>Sto organizzando un viaggio lungo</h3>
-                <p>Un controllo mirato prima di partire per affrontare il viaggio con maggiore serenità.</p>
-                <div className="actions" style={{ marginTop: 20 }}>
-                  <Link className="button secondary" href="/servizi/pre-viaggio">Scopri il controllo</Link>
-                </div>
-              </article>
-
-              <article className="card">
-                <div className="icon"><ShieldCheck /></div>
-                <h3>Voglio certificare la mia auto</h3>
-                <p>Una certificazione digitale dello stato del veicolo, utile da conservare o condividere.</p>
-                <div className="actions" style={{ marginTop: 20 }}>
-                  <Link className="button secondary" href="/servizi/vericert">Scopri VeriCert</Link>
+                <p>Tre livelli di verifica indipendente per scegliere il servizio più adatto al tuo acquisto.</p>
+                <div className="cards" style={{ marginTop: 20 }}>
+                  <Link className="card" href="/prenota?service=entry" style={{ display: "block" }}>
+                    <h4>Livello 1</h4>
+                    <p>Prima verifica dell'auto e del suo contesto.</p>
+                  </Link>
+                  <Link className="card" href="/prenota?service=99" style={{ display: "block" }}>
+                    <h4>Livello 2 · €99</h4>
+                    <p>Il livello centrale della V1 per una verifica più completa.</p>
+                  </Link>
+                  <Link className="card" href="/prenota?service=premium" style={{ display: "block" }}>
+                    <h4>Livello 3</h4>
+                    <p>Verifica approfondita per chi vuole il massimo livello di controllo.</p>
+                  </Link>
                 </div>
               </article>
             </div>
+          </div>
+        </section>
 
-            <div className="panel" style={{ marginTop: 32 }}>
-              <h3>Il servizio pre-acquisto parte da €99</h3>
-              <p>Stiamo completando i tre livelli e le relative prestazioni. Il prezzo di €99 è il livello centrale della V1.</p>
-              <Link className="button" href="/prenota?service=99">Prenota la verifica da €99</Link>
-            </div>
+        <section id="prenota" className="panel">
+          <div className="shell">
+            <h2>Pronto a fare una scelta più sicura?</h2>
+            <p>Seleziona il servizio e inizia la prenotazione.</p>
+            <Link className="button" href="/prenota">Prenota una verifica</Link>
           </div>
         </section>
       </main>
