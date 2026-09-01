@@ -1,25 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, ClipboardList, Euro, Home, Menu, UserRound } from "lucide-react";
+import { CalendarDays, ClipboardList, Euro, Home, Menu, UserRound, Settings, Clock3 } from "lucide-react";
 import { Header } from "@/components/Header";
 
 const stats = [
   { label: "Verifiche oggi", value: "4", icon: ClipboardList },
   { label: "Da completare", value: "2", icon: CalendarDays },
-  { label: "Guadagni mese", value: "€990", icon: Euro },
+  { label: "Guadagni mese", value: "€1.020", icon: Euro },
 ];
 
 const jobs = [
-  { id: "VD-24091", time: "10:30", car: "Volkswagen Golf 1.5 TSI", plate: "AB123CD", service: "Plus", status: "Da iniziare" },
-  { id: "VD-24092", time: "14:00", car: "Fiat 500 1.0 Hybrid", plate: "EF456GH", service: "Premium", status: "In attesa" },
-  { id: "VD-24088", time: "Ieri", car: "BMW 320d", plate: "IL789MN", service: "Plus", status: "Completata" },
+  { id: "VD-24091", time: "10:30", car: "Volkswagen Golf 1.5 TSI", plate: "AB123CD", service: "Plus", payout: "€80", status: "Da iniziare" },
+  { id: "VD-24092", time: "14:00", car: "Fiat 500 1.0 Hybrid", plate: "EF456GH", service: "Premium", payout: "€80", status: "In attesa" },
+  { id: "VD-24088", time: "Ieri", car: "BMW 320d", plate: "IL789MN", service: "Plus + Urgenza", payout: "€95", status: "Completata" },
 ];
 
 const nav = [
   ["Panoramica", "/officina", Home],
   ["Calendario", "/officina/calendario", CalendarDays],
   ["Pratiche", "/officina/checklist", ClipboardList],
+  ["Guadagni", "/officina/guadagni", Euro],
   ["Profilo", "/officina/profilo", UserRound],
 ] as const;
 
@@ -29,7 +30,7 @@ export default function Officina() {
       <Header />
       <div className="dashboard">
         <aside className="side" style={{ paddingBottom: 96 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 12 }}>
             <div>
               <div className="eyebrow">Partner VeriDrive</div>
               <h2 style={{ marginBottom: 0 }}>Centro Auto Milano</h2>
@@ -43,6 +44,11 @@ export default function Officina() {
                 {label}
               </Link>
             ))}
+          </div>
+          <div className="panel" style={{ marginTop: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Settings size={18} /><b>Impostazioni rapide</b></div>
+            <p style={{ margin: "10px 0 6px", fontSize: 14 }}>Massimo 4 verifiche al giorno</p>
+            <Link href="/officina/calendario" style={{ fontSize: 14 }}>Modifica disponibilità</Link>
           </div>
         </aside>
 
@@ -89,6 +95,7 @@ export default function Officina() {
                       <div style={{ fontSize: 14, opacity: 0.72 }}>{job.id} · {job.plate} · {job.time}</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{job.payout}</span>
                       <span className="badge">{job.status}</span>
                       {job.status !== "Completata" && <Link className="button secondary" href="/officina/checklist">Apri</Link>}
                     </div>
@@ -97,11 +104,26 @@ export default function Officina() {
               </div>
             </div>
           </section>
+
+          <section style={{ padding: "0 0 28px" }}>
+            <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+              <Link className="card" href="/officina/calendario">
+                <Clock3 size={22} />
+                <h3 style={{ marginTop: 10 }}>Disponibilità</h3>
+                <p>Imposta i singoli orari prenotabili, capacità giornaliera e chiusure.</p>
+              </Link>
+              <Link className="card" href="/officina/guadagni">
+                <Euro size={22} />
+                <h3 style={{ marginTop: 10 }}>Guadagni</h3>
+                <p>Controlla compensi, urgenze e pratiche già liquidate.</p>
+              </Link>
+            </div>
+          </section>
         </main>
       </div>
 
       <nav aria-label="Navigazione officina mobile" style={{ position: "fixed", left: 12, right: 12, bottom: 12, zIndex: 50, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, padding: 8, borderRadius: 20, border: "1px solid rgba(127,127,127,.18)", background: "rgba(255,255,255,.94)", backdropFilter: "blur(16px)", boxShadow: "0 12px 40px rgba(0,0,0,.12)" }}>
-        {nav.map(([label, href, Icon]) => (
+        {nav.slice(0, 4).map(([label, href, Icon]) => (
           <Link key={href} href={href} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, padding: "9px 4px", fontSize: 12, fontWeight: 600 }}>
             <Icon size={20} />
             <span>{label}</span>
