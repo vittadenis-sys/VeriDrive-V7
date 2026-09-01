@@ -39,12 +39,27 @@ create table if not exists public.bookings (
   requested_date date,
   requested_slot text,
   status public.booking_status not null default 'requested',
-  customer_price_cents integer not null default 7900 check (customer_price_cents = 7900),
+  customer_price_cents integer not null default 9900 check (customer_price_cents = 9900),
+  service_key text not null default 'plus',
+  listing_url text,
+  location text,
+  reschedule_count integer not null default 0 check (reschedule_count between 0 and 1),
+  rescheduled_at timestamptz,
   stripe_checkout_session_id text unique,
   stripe_payment_intent_id text unique,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- For an already-created database, migrate the legacy booking fields safely.
+alter table public.bookings add column if not exists service_key text not null default 'plus';
+alter table public.bookings add column if not exists listing_url text;
+alter table public.bookings add column if not exists location text;
+alter table public.bookings add column if not exists reschedule_count integer not null default 0;
+alter table public.bookings add column if not exists rescheduled_at timestamptz;
+alter table public.bookings alter column customer_price_cents set default 9900;
+alter table public.bookings drop constraint if exists bookings_customer_price_cents_check;
+alter table public.bookings add constraint bookings_customer_price_cents_check check (customer_price_cents = 9900);
 
 create table if not exists public.inspections (
   id uuid primary key default gen_random_uuid(),
@@ -157,8 +172,6 @@ end; $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.create_customer_profile();
 
-
--- Private photo bucket; uploads are restricted to authenticated operators.
 insert into storage.buckets (id, name, public) values ('inspection-photos','inspection-photos',false) on conflict (id) do nothing;
 create policy "authenticated upload inspection photos" on storage.objects for insert to authenticated with check (bucket_id = 'inspection-photos');
 create policy "authenticated read inspection photos" on storage.objects for select to authenticated using (bucket_id = 'inspection-photos');
