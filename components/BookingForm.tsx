@@ -75,7 +75,7 @@ export function BookingForm() {
         <label>
           Servizio
           <select name="service" value={service} onChange={(event) => setService(event.target.value)}>
-            <option value="plus">Verifica — €99</option>
+            <option value="plus">Verifica Plus — €99</option>
           </select>
         </label>
       </div>
@@ -93,7 +93,7 @@ export function BookingForm() {
       </div>
 
       {referenceType === "plate" ? (
-        <label>
+        <label className="full">
           Targa
           <input name="plate" required placeholder="AB123CD" autoCapitalize="characters" />
         </label>
@@ -135,6 +135,13 @@ export function BookingForm() {
         <p><b>Prima del pagamento</b></p>
         <p style={{ marginBottom: 8 }}>Totale: <b>€{price},00</b></p>
         <p style={{ marginBottom: 0 }}>{MOVE_POLICY}</p>
+      </div>
+
+      <div className="full panel" style={{ marginTop: 0 }}>
+        <p style={{ marginBottom: 8 }}><b>Cosa include la Verifica Plus</b></p>
+        <p style={{ marginBottom: 4 }}>✓ Controllo completo della checklist</p>
+        <p style={{ marginBottom: 4 }}>✓ VeriScore e report digitale</p>
+        <p style={{ marginBottom: 0 }}>✓ Foto solamente dei difetti riscontrati</p>
       </div>
 
       <button className="button full" disabled={busy} type="submit">
