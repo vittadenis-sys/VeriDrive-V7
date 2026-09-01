@@ -1,4 +1,78 @@
 import Link from "next/link";
-import { ShieldCheck, ClipboardCheck, QrCode } from "lucide-react";
-import { Header } from "@/components/Header"; import { Footer } from "@/components/Footer";
-export default function Home(){return <><Header/><main><section className="hero"><div className="shell hero-grid"><div><div className="eyebrow">Controlli indipendenti · risultati chiari</div><h1>Conosci davvero l’auto che stai scegliendo.</h1><p className="lead">VeriDrive trasforma una verifica professionale in un report semplice, certificato e condivisibile.</p><div className="actions"><Link className="button" href="/prenota">Prenota la verifica</Link><Link className="button secondary" href="/dashboard">Vedi un esempio</Link></div></div><div className="score-card"><div className="eyebrow" style={{color:"#54e0a7"}}>VERISCORE®</div><div className="score">92/100</div><h3>Volkswagen Golf 1.5 TSI</h3><div className="score-row"><span>50 controlli verificati</span><b>Report pronto</b></div><div className="score-row"><span>Tracciabilità completa</span><b>QR certificato</b></div></div></div></section><section id="come-funziona"><div className="shell"><div className="eyebrow">Come funziona</div><h2>Una scelta sicura in tre passaggi.</h2><div className="cards"><article className="card"><div className="icon"><ClipboardCheck/></div><h3>1. Prenoti</h3><p>Scegli veicolo, sede e fascia oraria. Ti confermiamo l’appuntamento in pochi minuti.</p></article><article className="card"><div className="icon"><ShieldCheck/></div><h3>2. Verifichiamo</h3><p>Un professionista completa la checklist VeriDrive di 50 punti, con foto e note.</p></article><article className="card"><div className="icon"><QrCode/></div><h3>3. Condividi</h3><p>Ricevi il report con VERISCORE e QR: una prova trasparente per chi acquista.</p></article></div></div></section></main><Footer/></>}
+import { CarFront, Plane, ShieldCheck, SearchCheck } from "lucide-react";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
+
+export default function Home() {
+  return (
+    <>
+      <Header />
+      <main>
+        <section className="hero">
+          <div className="shell">
+            <div className="eyebrow">VeriDrive · controlli indipendenti</div>
+            <h1>La tranquillità di sapere cosa stai guidando.</h1>
+            <p className="lead">
+              Scegli il servizio in base alla tua esigenza. VeriDrive coordina il controllo e ti consegna un risultato chiaro e documentato.
+            </p>
+          </div>
+        </section>
+
+        <section id="servizi">
+          <div className="shell">
+            <div className="eyebrow">Scegli la tua esigenza</div>
+            <h2>Come possiamo aiutarti?</h2>
+
+            <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+              <article className="card">
+                <div className="icon"><CarFront /></div>
+                <h3>Ho già un'auto</h3>
+                <p>Controlla la tua vettura prima di un viaggio o ottieni una certificazione dello stato del veicolo.</p>
+                <div className="actions" style={{ marginTop: 20 }}>
+                  <Link className="button secondary" href="/servizi/pre-viaggio">Controllo Pre Viaggio</Link>
+                  <Link className="button secondary" href="/servizi/vericert">VeriCert</Link>
+                </div>
+              </article>
+
+              <article className="card">
+                <div className="icon"><SearchCheck /></div>
+                <h3>Devo acquistare un'auto usata</h3>
+                <p>Tre livelli di verifica indipendente per aiutarti a scegliere con più sicurezza.</p>
+                <div className="actions" style={{ marginTop: 20 }}>
+                  <Link className="button secondary" href="/prenota?service=entry">Livello 1</Link>
+                  <Link className="button" href="/prenota?service=99">Livello 2 · €99</Link>
+                  <Link className="button secondary" href="/prenota?service=premium">Livello 3</Link>
+                </div>
+              </article>
+
+              <article className="card">
+                <div className="icon"><Plane /></div>
+                <h3>Sto organizzando un viaggio lungo</h3>
+                <p>Un controllo mirato prima di partire per affrontare il viaggio con maggiore serenità.</p>
+                <div className="actions" style={{ marginTop: 20 }}>
+                  <Link className="button secondary" href="/servizi/pre-viaggio">Scopri il controllo</Link>
+                </div>
+              </article>
+
+              <article className="card">
+                <div className="icon"><ShieldCheck /></div>
+                <h3>Voglio certificare la mia auto</h3>
+                <p>Una certificazione digitale dello stato del veicolo, utile da conservare o condividere.</p>
+                <div className="actions" style={{ marginTop: 20 }}>
+                  <Link className="button secondary" href="/servizi/vericert">Scopri VeriCert</Link>
+                </div>
+              </article>
+            </div>
+
+            <div className="panel" style={{ marginTop: 32 }}>
+              <h3>Il servizio pre-acquisto parte da €99</h3>
+              <p>Stiamo completando i tre livelli e le relative prestazioni. Il prezzo di €99 è il livello centrale della V1.</p>
+              <Link className="button" href="/prenota?service=99">Prenota la verifica da €99</Link>
+            </div>
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </>
+  );
+}
