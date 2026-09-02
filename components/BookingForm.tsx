@@ -2,11 +2,11 @@
 import { useMemo, useState } from "react";
 
 const SERVICES = {
-  online: { name: "Verifica Online", price: 39 },
-  base: { name: "Verifica Base", price: 99 },
-  plus: { name: "Verifica Plus", price: 139 },
-  previaggio: { name: "Controllo Pre Viaggio", price: 49 },
-  vericert: { name: "VeriCert", price: 99 },
+  online: { name: "Verifica Online", price: 39, certificate: false, photos: false },
+  base: { name: "Controllo Base", price: 99, certificate: true, photos: false },
+  plus: { name: "Verifica Plus", price: 149, certificate: true, photos: true },
+  previaggio: { name: "Controllo Viaggio", price: 49, certificate: false, photos: false },
+  vericert: { name: "Check-up + VeriScore", price: 99, certificate: true, photos: false },
 } as const;
 
 const MOVE_POLICY = "Appuntamento modificabile gratuitamente una sola volta, almeno 24 ore prima.";
@@ -20,7 +20,8 @@ export function BookingForm() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const price = useMemo(() => SERVICES[service].price + (urgency ? 25 : 0), [service, urgency]);
+  const selected = SERVICES[service];
+  const price = useMemo(() => selected.price + (urgency ? 25 : 0), [selected.price, urgency]);
 
   async function submit(form: FormData) {
     setBusy(true);
@@ -76,17 +77,22 @@ export function BookingForm() {
     }
   }
 
+  function handleServiceChange(next: keyof typeof SERVICES) {
+    setService(next);
+    if (next === "online") setReferenceType("listing");
+  }
+
   return (
     <form action={submit} className="panel form">
       <div className="full">
         <label>
           Servizio
-          <select name="service" value={service} onChange={(event) => setService(event.target.value as keyof typeof SERVICES)}>
-            <option value="previaggio">Controllo Pre Viaggio — €49</option>
-            <option value="vericert">VeriCert — €99</option>
+          <select name="service" value={service} onChange={(event) => handleServiceChange(event.target.value as keyof typeof SERVICES)}>
+            <option value="previaggio">Controllo Viaggio — €49</option>
+            <option value="vericert">Check-up + VeriScore — €99</option>
             <option value="online">Verifica Online — €39</option>
-            <option value="base">Verifica Base — €99</option>
-            <option value="plus">Verifica Plus — €139</option>
+            <option value="base">Controllo Base — €99</option>
+            <option value="plus">Verifica Plus — €149</option>
           </select>
         </label>
       </div>
@@ -123,19 +129,23 @@ export function BookingForm() {
         <p style={{ marginBottom: 0 }}>{MOVE_POLICY}</p>
       </div>
 
-      {service === "plus" && (
+      {selected.certificate && (
         <div className="full panel" style={{ marginTop: 0 }}>
-          <p style={{ marginBottom: 8 }}><b>Cosa include la Verifica Plus</b></p>
-          <p style={{ marginBottom: 4 }}>✓ Controllo completo della checklist</p>
-          <p style={{ marginBottom: 4 }}>✓ VeriScore e report digitale</p>
-          <p style={{ marginBottom: 0 }}>✓ Foto solamente dei difetti riscontrati</p>
+          <p style={{ marginBottom: 4 }}><b>Certificato VeriDrive incluso</b></p>
+          <p style={{ marginBottom: 0 }}>VeriScore, risultato della verifica, certificato digitale e QR pubblico di verifica.</p>
+        </div>
+      )}
+
+      {selected.photos && (
+        <div className="full panel" style={{ marginTop: 0 }}>
+          <p style={{ marginBottom: 0 }}><b>Foto solamente dei difetti riscontrati.</b></p>
         </div>
       )}
 
       {service === "online" && (
         <div className="full panel" style={{ marginTop: 0 }}>
           <p style={{ marginBottom: 4 }}><b>Verifica Online</b></p>
-          <p style={{ marginBottom: 0 }}>Analisi manuale da parte di un tecnico qualificato entro 3 ore lavorative. Servizio non garantito la domenica e nei festivi.</p>
+          <p style={{ marginBottom: 0 }}>Analisi manuale da parte di un tecnico qualificato entro 3 ore lavorative. Servizio attivo dal lunedì al venerdì 09:00–18:00 e il sabato 09:00–13:00; domeniche e festivi esclusi.</p>
         </div>
       )}
 
