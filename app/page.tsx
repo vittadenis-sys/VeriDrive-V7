@@ -5,16 +5,16 @@ import { Footer } from "@/components/Footer";
 
 const ownerServices = [
   {
-    href: "/servizi/pre-viaggio",
-    name: "Controllo Pre Viaggio",
+    href: "/prenota?service=previaggio",
+    name: "Controllo Viaggio",
     price: "49 €",
-    description: "Un controllo mirato per partire più tranquillo, con esito chiaro e indicazione delle criticità.",
+    description: "Controllo della tua auto prima di partire, per individuare le principali criticità di sicurezza.",
   },
   {
-    href: "/servizi/vericert",
-    name: "VeriCert",
+    href: "/prenota?service=vericert",
+    name: "Check-up + VeriScore",
     price: "99 €",
-    description: "La verifica completa del veicolo, con checklist, VeriScore e certificazione digitale.",
+    description: "Controllo completo del veicolo con checklist, VeriScore e certificato digitale.",
   },
 ];
 
@@ -27,24 +27,24 @@ const purchaseServices = [
   },
   {
     key: "base",
-    name: "Verifica Base",
+    name: "Controllo Base",
     price: "99 €",
-    description: "Controllo completo del veicolo in officina, checklist, VeriScore e report digitale.",
+    description: "Lo stesso controllo completo della verifica in officina, con VeriScore e certificato digitale.",
     featured: true,
   },
   {
     key: "plus",
     name: "Verifica Plus",
-    price: "139 €",
-    description: "Come la Base, con foto esclusivamente dei difetti riscontrati e una documentazione più approfondita.",
+    price: "149 €",
+    description: "Come il Controllo Base, con foto esclusivamente dei difetti riscontrati.",
   },
 ];
 
 const steps = [
-  { icon: ClipboardCheck, title: "Prenoti", text: "Inserisci targa o link dell'annuncio, luogo e momento della verifica." },
-  { icon: Wrench, title: "Controlliamo", text: "Una verifica indipendente viene eseguita seguendo una checklist strutturata." },
-  { icon: FileCheck2, title: "Ricevi il report", text: "Ottieni esito, VeriScore e, dove previsto, le foto dei difetti riscontrati." },
-  { icon: QrCode, title: "Verifichi il certificato", text: "Il QR pubblico permette di controllare l'autenticità della certificazione." },
+  { icon: ClipboardCheck, title: "Prenoti", text: "Inserisci targa o link dell'annuncio, posizione e momento della verifica." },
+  { icon: Wrench, title: "Verifichiamo", text: "Quando serve l'officina, la pratica viene affidata automaticamente alla partner più vicina disponibile." },
+  { icon: FileCheck2, title: "Ricevi il certificato", text: "Per i servizi previsti ottieni checklist, VeriScore e certificato digitale con QR." },
+  { icon: QrCode, title: "Verifichi online", text: "Il QR pubblico permette di controllare l'autenticità del certificato." },
 ];
 
 export default function Home() {
@@ -57,7 +57,7 @@ export default function Home() {
             <div className="eyebrow">VERIDRIVE · VERIFICHE INDIPENDENTI</div>
             <h1>Controlla. Compra. Vendi.<br />Con più sicurezza.</h1>
             <p className="lead">
-              Verifiche auto semplici, professionali e tracciabili. Tu scegli cosa ti serve, noi trasformiamo il controllo in informazioni che puoi capire e condividere.
+              Verifiche auto semplici, professionali e tracciabili. Scegli il servizio giusto e lascia che VeriDrive gestisca il resto.
             </p>
             <div className="actions">
               <Link className="button" href="#percorsi">Scopri le verifiche</Link>
@@ -75,7 +75,7 @@ export default function Home() {
           <div className="shell">
             <div className="eyebrow">SCEGLI IL TUO PERCORSO</div>
             <h2>Di cosa hai bisogno?</h2>
-            <p className="lead">Due percorsi chiari, pensati per chi possiede già un'auto e per chi sta per comprarne una usata.</p>
+            <p className="lead">Due percorsi chiari, con servizi pensati per chi possiede già un'auto e per chi sta per comprarne una usata.</p>
 
             <div className="journeys">
               <article className="journey card">
@@ -86,7 +86,7 @@ export default function Home() {
                     <h3>Voglio controllare la mia auto</h3>
                   </div>
                 </div>
-                <p>Prima di un viaggio oppure perché vuoi certificare lo stato della vettura con un documento verificabile.</p>
+                <p>Controllala prima di un viaggio oppure fai un check-up completo con certificazione e VeriScore.</p>
                 <div className="service-list">
                   {ownerServices.map((service) => (
                     <Link key={service.href} className="service-item" href={service.href}>
@@ -104,11 +104,11 @@ export default function Home() {
                 <div className="journey-heading">
                   <div className="icon"><SearchCheck size={24} /></div>
                   <div>
-                    <div className="eyebrow">DEVO COMPRARE UN'AUTO</div>
+                    <div className="eyebrow">DEVO COMPRARE UN'AUTO USATA</div>
                     <h3>Voglio verificare un usato</h3>
                   </div>
                 </div>
-                <p>Prima di acquistare, scegli il livello di controllo più adatto al tuo budget e alla tua esigenza.</p>
+                <p>Scegli tra una verifica completamente online e due livelli di controllo in officina.</p>
                 <div className="service-list">
                   {purchaseServices.map((service) => (
                     <Link key={service.key} className={`service-item ${service.featured ? "featured" : ""}`} href={`/prenota?service=${service.key}`}>
@@ -129,7 +129,7 @@ export default function Home() {
         <section className="panel-section">
           <div className="shell">
             <div className="eyebrow">COME FUNZIONA</div>
-            <h2>Dal controllo al certificato, senza complicazioni.</h2>
+            <h2>Tu scegli il servizio. VeriDrive organizza il controllo.</h2>
             <div className="steps">
               {steps.map(({ icon: Icon, title, text }, index) => (
                 <div className="step" key={title}>
@@ -148,13 +148,13 @@ export default function Home() {
             <div className="proof-grid">
               <div>
                 <div className="eyebrow">PERCHÉ VERIDRIVE</div>
-                <h2>Non ti diamo solo un parere. Ti lasciamo una prova.</h2>
-                <p className="lead">Ogni verifica è pensata per produrre un risultato leggibile, condivisibile e collegato a una certificazione pubblicamente verificabile.</p>
+                <h2>Una verifica deve lasciare una traccia.</h2>
+                <p className="lead">Per i servizi certificati il risultato diventa un documento digitale verificabile, con VeriScore e QR pubblico.</p>
               </div>
               <div className="proof-cards">
-                <div className="mini-card"><ShieldCheck /><strong>VeriScore</strong><span>Un punteggio immediato per leggere il risultato a colpo d'occhio.</span></div>
-                <div className="mini-card"><QrCode /><strong>QR verificabile</strong><span>Il certificato può essere controllato online tramite codice pubblico.</span></div>
-                <div className="mini-card"><FileCheck2 /><strong>Report digitale</strong><span>Checklist e risultato raccolti in un documento chiaro.</span></div>
+                <div className="mini-card"><ShieldCheck /><strong>VeriScore</strong><span>Un punteggio chiaro per leggere rapidamente il risultato della verifica.</span></div>
+                <div className="mini-card"><QrCode /><strong>QR verificabile</strong><span>Il certificato può essere controllato online tramite il suo codice pubblico.</span></div>
+                <div className="mini-card"><FileCheck2 /><strong>Certificato digitale</strong><span>Checklist e risultato restano raccolti in un documento condivisibile.</span></div>
               </div>
             </div>
           </div>
