@@ -6,7 +6,6 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": ".open-next/assets",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
+    "binding": "ASSETS"
   }
 }
