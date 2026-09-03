@@ -27,7 +27,7 @@ export default function Checklist() {
     <main className="page">
       <div className="shell">
         <Link href="/officina">← Torna alla dashboard</Link>
-        <div className="eyebrow" style={{ marginTop: 24 }}>Pratica di test · Verifica Plus</div>
+        <div className="eyebrow" style={{ marginTop: 24 }}>Verifica #VD-2026-0042 · Verifica Plus</div>
         <h1 style={{ fontSize: "clamp(34px, 6vw, 48px)" }}>Checklist Volkswagen Golf</h1>
 
         <div className="panel" style={{ position: "sticky", top: 86, zIndex: 2, display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
@@ -43,7 +43,10 @@ export default function Checklist() {
           {checklist.map((item) => (
             <div className="check" key={item.id} style={{ display: "block" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                <span style={{ minWidth: 220, flex: "1 1 260px" }}><small>{item.id}. {item.area}</small><br /><b>{item.label}</b></span>
+                <span style={{ minWidth: 220, flex: "1 1 260px" }}>
+                  <small>{item.id}. {item.area}</small><br />
+                  <b>{item.label}</b>
+                </span>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                   <button type="button" className={`button ${values[item.id] === "ok" ? "" : "secondary"}`} onClick={() => setResult(item.id, "ok")}>OK</button>
                   <button type="button" className={`button ${values[item.id] === "issue" ? "" : "secondary"}`} onClick={() => setResult(item.id, "issue")}>Problema</button>
@@ -55,7 +58,8 @@ export default function Checklist() {
         </div>
 
         <section className="panel" style={{ marginTop: 24 }}>
-          <h3>Foto dei difetti</h3><p>{PHOTO_POLICY}</p>
+          <h3>Foto dei difetti</h3>
+          <p>{PHOTO_POLICY}</p>
           <input type="file" accept="image/*" multiple onChange={(event) => setPhotoCount(event.target.files?.length ?? 0)} />
           <p style={{ marginTop: 8, marginBottom: 0 }}>{photoCount ? `${photoCount} foto selezionate.` : "Nessuna foto selezionata."}</p>
         </section>
@@ -66,11 +70,12 @@ export default function Checklist() {
         </section>
 
         <div className="actions" style={{ marginTop: 24 }}>
-          <button type="button" className="button" onClick={() => setSaved(true)} disabled={!completed}>Salva ispezione di test</button>
+          <button type="button" className="button" onClick={() => setSaved(true)} disabled={!completed}>Salva ispezione</button>
           <Link className="button secondary" href="/report/demo">Anteprima report</Link>
-          {canClose && <button type="button" className="button" onClick={() => setSaved(true)}>Chiudi verifica di test</button>}
+          {canClose && <button type="button" className="button" onClick={() => setSaved(true)}>Chiudi verifica</button>}
         </div>
-        {saved && <p className="notice" style={{ marginTop: 16 }}>Stato della prova aggiornato.</p>}
+
+        {saved && <p className="notice" style={{ marginTop: 16 }}>Stato ispezione aggiornato. Il report può essere verificato dall'Area Cliente.</p>}
       </div>
     </main>
   );
