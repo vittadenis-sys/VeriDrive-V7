@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CarFront, SearchCheck, ShieldCheck, ArrowRight, QrCode, Gauge } from "lucide-react";
+import { ArrowRight, CarFront, Gauge, QrCode, SearchCheck, ShieldCheck } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
@@ -59,12 +59,10 @@ export default function Home() {
             <div className="journeys">
               <article className="journey card">
                 <div className="journey-heading"><div className="icon"><CarFront size={24} /></div><div><div className="eyebrow">HO GIÀ UN'AUTO</div><h3>Controlla la tua vettura</h3></div></div>
-                <p>Per partire più tranquillo o avere un check-up certificato.</p>
                 <div className="service-list">{ownerServices.map((service) => <Link key={service.href} className="service-item" href={service.href}><div><strong>{service.name}</strong><span>{service.description}</span></div><div className="service-price">{service.price}<ArrowRight size={18} /></div></Link>)}</div>
               </article>
               <article className="journey card">
                 <div className="journey-heading"><div className="icon"><SearchCheck size={24} /></div><div><div className="eyebrow">DEVO COMPRARE UN'AUTO USATA</div><h3>Verifica prima di acquistare</h3></div></div>
-                <p>Dall'annuncio alla verifica completa in officina.</p>
                 <div className="service-list">{purchaseServices.map((service) => <Link key={service.href} className={`service-item ${service.featured ? "featured" : ""}`} href={service.href}><div>{service.featured && <span className="recommended">PIÙ SCELTA</span>}<strong>{service.name}</strong><span>{service.description}</span></div><div className="service-price">{service.price}<ArrowRight size={18} /></div></Link>)}</div>
               </article>
             </div>
