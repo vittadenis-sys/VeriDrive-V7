@@ -5,8 +5,8 @@ export function Header(){
   return (
     <header>
       <div className="shell nav">
-        <Link href="/" className="logo">veri<span>drive</span></Link>
-        <nav>
+        <Link href="/" className="logo" aria-label="VeriDrive home">veri<span>drive</span></Link>
+        <nav aria-label="Navigazione principale">
           <div className="nav-group">
             <Link href="/auto">Auto privata <ChevronDown size={13} /></Link>
             <div className="nav-menu">
