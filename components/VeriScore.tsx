@@ -24,14 +24,22 @@ export function VeriScore({ score, size = 140, label }: VeriScoreProps) {
       aria-label={`VeriScore ${normalized} su 100`}
     >
       <svg viewBox="0 0 120 120" role="img" aria-hidden="true">
-        <circle className="veriscore-track" cx="60" cy="60" r={radius} fill="none" />
+        <circle
+          className="veriscore-track"
+          cx="60"
+          cy="60"
+          r={radius}
+          fill="none"
+          stroke="#E5E7EB"
+          strokeWidth="8"
+        />
         <circle
           className="veriscore-progress"
           cx="60"
           cy="60"
           r={radius}
           fill="none"
-          stroke="currentColor"
+          stroke={tone}
           strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={`${progress} ${circumference - progress}`}
@@ -39,7 +47,7 @@ export function VeriScore({ score, size = 140, label }: VeriScoreProps) {
         />
         <text className="veriscore-label" x="60" y="46" textAnchor="middle" fill="#64748B">VeriScore</text>
         <text className="veriscore-value" x="60" y="74" textAnchor="middle" fill="#0F172A" fontWeight="700">{normalized}</text>
-        <text className="veriscore-status" x="60" y="91" textAnchor="middle" fill="currentColor">{label ?? getLabel(normalized)}</text>
+        <text className="veriscore-status" x="60" y="91" textAnchor="middle" fill={tone}>{label ?? getLabel(normalized)}</text>
       </svg>
     </div>
   );
