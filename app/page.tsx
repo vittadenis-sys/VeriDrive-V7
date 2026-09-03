@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, CarFront, Gauge, QrCode, SearchCheck, ShieldCheck } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { VeriScore } from "@/components/VeriScore";
 
 const ownerServices = [
   { href: "/auto#viaggio", name: "Controllo Viaggio", price: "49 €", description: "Prima di partire, controlla le principali criticità di sicurezza." },
@@ -41,7 +42,7 @@ export default function Home() {
                 <div className="inspection-car"><div className="car-roof" /><div className="car-body" /><div className="wheel wheel-a" /><div className="wheel wheel-b" /><div className="headlight" /></div>
                 <div className="inspection-card">
                   <div className="inspection-card-top"><span>VERIDRIVE CHECK</span><span>VERIFICATO</span></div>
-                  <div className="inspection-row"><Gauge size={18} /><span>VeriScore</span><strong>92/100</strong></div>
+                  <VeriScore score={92} size={118} />
                   <div className="inspection-row"><ShieldCheck size={18} /><span>Controlli</span><strong>48/50</strong></div>
                   <div className="inspection-row"><QrCode size={18} /><span>Certificato</span><strong>QR</strong></div>
                 </div>
@@ -69,14 +70,19 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="panel-section">
-          <div className="shell">
-            <div className="proof-grid">
-              <div><div className="eyebrow">PERCHÉ VERIDRIVE</div><h2>Una verifica che lascia una prova.</h2><p className="lead">Per i servizi certificati, il risultato diventa un documento digitale verificabile con VeriScore e QR pubblico.</p></div>
-              <div className="proof-cards">
-                <div className="mini-card"><ShieldCheck /><strong>Metodo standardizzato</strong><span>Controlli strutturati per rendere i risultati più leggibili.</span></div>
-                <div className="mini-card"><Gauge /><strong>VeriScore</strong><span>Un punteggio sintetico per capire subito il risultato.</span></div>
-                <div className="mini-card"><QrCode /><strong>QR verificabile</strong><span>Il certificato può essere verificato online.</span></div>
+        <section className="panel-section veriscore-section">
+          <div className="shell veriscore-showcase">
+            <div>
+              <div className="eyebrow">VERISCORE®</div>
+              <h2>Un numero per capire subito il risultato.</h2>
+              <p className="lead">Il VeriScore sintetizza l'esito della verifica in un formato chiaro e leggibile. Nei servizi certificati accompagna il certificato digitale verificabile.</p>
+            </div>
+            <div className="veriscore-demo card">
+              <VeriScore score={92} size={176} />
+              <div>
+                <strong>92/100 · Ottimo</strong>
+                <span>48 controlli superati su 50</span>
+                <small>Anteprima dimostrativa del risultato.</small>
               </div>
             </div>
           </div>
