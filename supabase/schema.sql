@@ -22,6 +22,10 @@ create table if not exists public.workshops (
   phone text,
   address text,
   city text,
+  postal_code text,
+  latitude numeric(9,6),
+  longitude numeric(9,6),
+  radius_km numeric(6,2) not null default 25,
   description text,
   is_active boolean not null default false,
   created_at timestamptz not null default now(),
@@ -39,7 +43,7 @@ create table if not exists public.bookings (
   requested_date date,
   requested_slot text,
   status public.booking_status not null default 'requested',
-  customer_price_cents integer not null default 9900 check (customer_price_cents in (3900,4900,9900,13900)),
+  customer_price_cents integer not null default 9900 check (customer_price_cents in (3900,4900,9900,12400,14900,17400)),
   service_key text not null default 'base',
   listing_url text,
   location text,
@@ -53,7 +57,6 @@ create table if not exists public.bookings (
   updated_at timestamptz not null default now()
 );
 
--- For an already-created database, migrate the booking fields safely.
 alter table public.bookings add column if not exists service_key text not null default 'base';
 alter table public.bookings add column if not exists listing_url text;
 alter table public.bookings add column if not exists location text;
@@ -63,7 +66,7 @@ alter table public.bookings add column if not exists reschedule_count integer no
 alter table public.bookings add column if not exists rescheduled_at timestamptz;
 alter table public.bookings alter column customer_price_cents set default 9900;
 alter table public.bookings drop constraint if exists bookings_customer_price_cents_check;
-alter table public.bookings add constraint bookings_customer_price_cents_check check (customer_price_cents in (3900,4900,9900,13900));
+alter table public.bookings add constraint bookings_customer_price_cents_check check (customer_price_cents in (3900,4900,9900,12400,14900,17400));
 
 create table if not exists public.inspections (
   id uuid primary key default gen_random_uuid(),
@@ -94,6 +97,17 @@ create table if not exists public.photos (
   caption text,
   check_id integer check (check_id between 1 and 50),
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.repair_estimates (
+  id uuid primary key default gen_random_uuid(),
+  inspection_id uuid unique not null references public.inspections(id) on delete cascade,
+  total_min_cents integer not null default 0 check (total_min_cents >= 0),
+  total_max_cents integer not null default 0 check (total_max_cents >= total_min_cents),
+  items jsonb not null default '[]'::jsonb,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.payouts (
@@ -144,6 +158,8 @@ $$;
 
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$ begin new.updated_at = now(); return new; end; $$;
+
+-- Existing trigger recreation kept idempotent.
 drop trigger if exists customers_touch on public.customers;
 create trigger customers_touch before update on public.customers for each row execute function public.touch_updated_at();
 drop trigger if exists workshops_touch on public.workshops;
@@ -152,6 +168,8 @@ drop trigger if exists bookings_touch on public.bookings;
 create trigger bookings_touch before update on public.bookings for each row execute function public.touch_updated_at();
 drop trigger if exists inspections_touch on public.inspections;
 create trigger inspections_touch before update on public.inspections for each row execute function public.touch_updated_at();
+drop trigger if exists repair_estimates_touch on public.repair_estimates;
+create trigger repair_estimates_touch before update on public.repair_estimates for each row execute function public.touch_updated_at();
 
 alter table public.customers enable row level security;
 alter table public.workshops enable row level security;
@@ -159,33 +177,36 @@ alter table public.bookings enable row level security;
 alter table public.inspections enable row level security;
 alter table public.certificates enable row level security;
 alter table public.photos enable row level security;
+alter table public.repair_estimates enable row level security;
 alter table public.payouts enable row level security;
 alter table public.workshop_closures enable row level security;
 alter table public.workshop_schedule enable row level security;
 alter table public.workshop_settings enable row level security;
 alter table public.settings enable row level security;
 
-create policy "customers read self" on public.customers for select using (auth_id = auth.uid());
-create policy "customers update self" on public.customers for update using (auth_id = auth.uid());
-create policy "public read active workshops" on public.workshops for select using (is_active = true or owner_auth_id = auth.uid());
-create policy "owners update workshop" on public.workshops for update using (owner_auth_id = auth.uid());
-create policy "customers create bookings" on public.bookings for insert with check (customer_id in (select id from public.customers where auth_id = auth.uid()));
-create policy "customers read bookings" on public.bookings for select using (customer_id in (select id from public.customers where auth_id = auth.uid()));
-create policy "workshops read bookings" on public.bookings for select using (public.is_workshop_owner(workshop_id));
-create policy "workshops update bookings" on public.bookings for update using (public.is_workshop_owner(workshop_id));
-create policy "customers read inspections" on public.inspections for select using (booking_id in (select b.id from public.bookings b join public.customers c on c.id=b.customer_id where c.auth_id=auth.uid()));
-create policy "workshops manage inspections" on public.inspections for all using (booking_id in (select id from public.bookings where public.is_workshop_owner(workshop_id)));
-create policy "customers read certificates" on public.certificates for select using (inspection_id in (select i.id from public.inspections i join public.bookings b on b.id=i.booking_id join public.customers c on c.id=b.customer_id where c.auth_id=auth.uid()));
-create policy "workshops manage certificates" on public.certificates for all using (inspection_id in (select i.id from public.inspections i join public.bookings b on b.id=i.booking_id where public.is_workshop_owner(b.workshop_id)));
-create policy "customers read photos" on public.photos for select using (inspection_id in (select i.id from public.inspections i join public.bookings b on b.id=i.booking_id join public.customers c on c.id=b.customer_id where c.auth_id=auth.uid()));
-create policy "workshops manage photos" on public.photos for all using (inspection_id in (select i.id from public.inspections i join public.bookings b on b.id=i.booking_id where public.is_workshop_owner(b.workshop_id)));
-create policy "workshops read payouts" on public.payouts for select using (public.is_workshop_owner(workshop_id));
-create policy "workshops read closures" on public.workshop_closures for select using (public.is_workshop_owner(workshop_id));
-create policy "workshops manage closures" on public.workshop_closures for all using (public.is_workshop_owner(workshop_id));
-create policy "workshops read schedule" on public.workshop_schedule for select using (public.is_workshop_owner(workshop_id));
-create policy "workshops manage schedule" on public.workshop_schedule for all using (public.is_workshop_owner(workshop_id));
-create policy "workshops read settings" on public.workshop_settings for select using (public.is_workshop_owner(workshop_id));
-create policy "workshops manage settings" on public.workshop_settings for all using (public.is_workshop_owner(workshop_id));
+create policy if not exists "customers read self" on public.customers for select using (auth_id = auth.uid());
+create policy if not exists "customers update self" on public.customers for update using (auth_id = auth.uid());
+create policy if not exists "public read active workshops" on public.workshops for select using (is_active = true or owner_auth_id = auth.uid());
+create policy if not exists "owners update workshop" on public.workshops for update using (owner_auth_id = auth.uid());
+create policy if not exists "customers create bookings" on public.bookings for insert with check (customer_id in (select id from public.customers where auth_id = auth.uid()));
+create policy if not exists "customers read bookings" on public.bookings for select using (customer_id in (select id from public.customers where auth_id = auth.uid()));
+create policy if not exists "workshops read bookings" on public.bookings for select using (public.is_workshop_owner(workshop_id));
+create policy if not exists "workshops update bookings" on public.bookings for update using (public.is_workshop_owner(workshop_id));
+create policy if not exists "customers read inspections" on public.inspections for select using (booking_id in (select b.id from public.bookings b join public.customers c on c.id=b.customer_id where c.auth_id=auth.uid()));
+create policy if not exists "workshops manage inspections" on public.inspections for all using (booking_id in (select b.id from public.bookings b where public.is_workshop_owner(b.workshop_id)));
+create policy if not exists "customers read certificates" on public.certificates for select using (inspection_id in (select i.id from public.inspections i join public.bookings b on b.id=i.booking_id join public.customers c on c.id=b.customer_id where c.auth_id=auth.uid()));
+create policy if not exists "workshops manage certificates" on public.certificates for all using (inspection_id in (select i.id from public.inspections i join public.bookings b on b.id=i.booking_id where public.is_workshop_owner(b.workshop_id)));
+create policy if not exists "customers read photos" on public.photos for select using (inspection_id in (select i.id from public.inspections i join public.bookings b on b.id=i.booking_id join public.customers c on c.id=b.customer_id where c.auth_id=auth.uid()));
+create policy if not exists "workshops manage photos" on public.photos for all using (inspection_id in (select i.id from public.inspections i join public.bookings b on b.id=i.booking_id where public.is_workshop_owner(b.workshop_id)));
+create policy if not exists "customers read repair estimates" on public.repair_estimates for select using (inspection_id in (select i.id from public.inspections i join public.bookings b on b.id=i.booking_id join public.customers c on c.id=b.customer_id where c.auth_id=auth.uid()));
+create policy if not exists "workshops manage repair estimates" on public.repair_estimates for all using (inspection_id in (select i.id from public.inspections i join public.bookings b on b.id=i.booking_id where public.is_workshop_owner(b.workshop_id)));
+create policy if not exists "workshops read payouts" on public.payouts for select using (public.is_workshop_owner(workshop_id));
+create policy if not exists "workshops read closures" on public.workshop_closures for select using (public.is_workshop_owner(workshop_id));
+create policy if not exists "workshops manage closures" on public.workshop_closures for all using (public.is_workshop_owner(workshop_id));
+create policy if not exists "workshops read schedule" on public.workshop_schedule for select using (public.is_workshop_owner(workshop_id));
+create policy if not exists "workshops manage schedule" on public.workshop_schedule for all using (public.is_workshop_owner(workshop_id));
+create policy if not exists "workshops read settings" on public.workshop_settings for select using (public.is_workshop_owner(workshop_id));
+create policy if not exists "workshops manage settings" on public.workshop_settings for all using (public.is_workshop_owner(workshop_id));
 
 create or replace function public.create_customer_profile()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -194,11 +215,11 @@ begin
   values (new.id, coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)));
   return new;
 end; $$;
+
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.create_customer_profile();
 
 insert into storage.buckets (id, name, public) values ('inspection-photos','inspection-photos',false) on conflict (id) do nothing;
-create policy "authenticated upload inspection photos" on storage.objects for insert to authenticated with check (bucket_id = 'inspection-photos');
-create policy "authenticated read inspection photos" on storage.objects for select to authenticated using (bucket_id = 'inspection-photos');
-
-create policy "authenticated create workshop" on public.workshops for insert to authenticated with check (owner_auth_id = auth.uid());
+create policy if not exists "authenticated upload inspection photos" on storage.objects for insert to authenticated with check (bucket_id = 'inspection-photos');
+create policy if not exists "authenticated read inspection photos" on storage.objects for select to authenticated using (bucket_id = 'inspection-photos');
+create policy if not exists "authenticated create workshop" on public.workshops for insert to authenticated with check (owner_auth_id = auth.uid());
