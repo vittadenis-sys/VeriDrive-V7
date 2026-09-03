@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
-
-const VERIFICATION_PRICE_CENTS = 9900;
+import { getService, getCustomerPriceCents } from "@/lib/services";
 
 export async function POST(request: Request) {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -41,14 +40,21 @@ export async function POST(request: Request) {
     if (existing.url) return NextResponse.json({ url: existing.url });
   }
 
-  const amount = booking.customer_price_cents ?? VERIFICATION_PRICE_CENTS;
-  if (amount !== VERIFICATION_PRICE_CENTS || booking.service_key !== "plus") {
-    return NextResponse.json({ error: "Importo o servizio della prenotazione non valido." }, { status: 400 });
+  const service = getService(String(booking.service_key));
+  if (!service) return NextResponse.json({ error: "Servizio della prenotazione non valido." }, { status: 400 });
+
+  const storedAmount = Number(booking.customer_price_cents ?? 0);
+  if (!storedAmount) return NextResponse.json({ error: "Importo della prenotazione non valido." }, { status: 400 });
+
+  const basePrice = service.priceCents;
+  const urgency = storedAmount === basePrice + 2500;
+  if (storedAmount !== getCustomerPriceCents(service.key, urgency)) {
+    return NextResponse.json({ error: "Importo della prenotazione non valido." }, { status: 400 });
   }
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const label = [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" · ");
-  const reference = booking.listing_url ? "Auto indicata tramite link annuncio" : (booking.plate || "Veicolo usato");
+  const reference = booking.listing_url ? "Auto indicata tramite link annuncio" : (booking.plate || "Veicolo");
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -56,17 +62,17 @@ export async function POST(request: Request) {
       price_data: {
         currency: "eur",
         product_data: {
-          name: "Verifica Plus VeriDrive",
-          description: [label || "Verifica veicolo usato", reference, booking.location || ""].filter(Boolean).join(" · "),
+          name: service.name,
+          description: [label || "Verifica veicolo", reference, booking.location || ""].filter(Boolean).join(" · "),
         },
-        unit_amount: VERIFICATION_PRICE_CENTS,
+        unit_amount: storedAmount,
       },
       quantity: 1,
     }],
     customer_email: user.email ?? undefined,
     success_url: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/dashboard?paid=${booking.id}`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/prenota?cancelled=${booking.id}`,
-    metadata: { bookingId: booking.id, service: "plus", priceCents: String(VERIFICATION_PRICE_CENTS) },
+    metadata: { bookingId: booking.id, service: service.key, priceCents: String(storedAmount), urgency: String(urgency) },
   });
 
   const { error: updateError } = await supabase
