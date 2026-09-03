@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { sendBookingConfirmation } from "@/lib/notifications";
 import { getCustomerPriceCents, getService, type ServiceKey } from "@/lib/services";
 
-const SERVICE_KEYS: ServiceKey[] = ["previaggio", "vericert", "online", "base", "plus"];
+const SERVICE_KEYS: ServiceKey[] = ["check_viaggio", "veriscore", "check_online", "veriscore_plus"];
 
 function isValidDate(value: unknown) {
   if (typeof value !== "string" || !value) return false;
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   if (!SERVICE_KEYS.includes(serviceKey) || !getService(serviceKey)) return NextResponse.json({ error: "Servizio non valido." }, { status: 400 });
 
   const service = getService(serviceKey)!;
-  const isOnline = serviceKey === "online";
+  const isOnline = serviceKey === "check_online";
   const urgency = !isOnline && body.urgency === true;
   const customerPriceCents = getCustomerPriceCents(serviceKey, urgency);
   if (customerPriceCents == null) return NextResponse.json({ error: "Impossibile calcolare il prezzo." }, { status: 400 });
