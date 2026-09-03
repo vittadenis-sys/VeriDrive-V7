@@ -1,27 +1,25 @@
 "use client";
 import { useMemo, useState } from "react";
-
-const SERVICES = {
-  online: { name: "Verifica Online", price: 39, certificate: false, photos: false },
-  base: { name: "Controllo Base", price: 99, certificate: true, photos: false },
-  plus: { name: "Verifica Plus", price: 149, certificate: true, photos: true },
-  previaggio: { name: "Controllo Viaggio", price: 49, certificate: false, photos: false },
-  vericert: { name: "Check-up + VeriScore", price: 99, certificate: true, photos: false },
-} as const;
+import { VERIDRIVE_SERVICES } from "@/lib/services";
 
 const MOVE_POLICY = "Appuntamento modificabile gratuitamente una sola volta, almeno 24 ore prima.";
+const STEPS = ["Percorso", "Servizio", "Veicolo", "Località", "Conferma"];
+const SERVICE_KEYS = ["previaggio", "vericert", "online", "base", "plus"] as const;
+type ServiceKey = (typeof SERVICE_KEYS)[number];
 
 export function BookingForm() {
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-  const initialService = params?.get("service") ?? "plus";
-  const [service, setService] = useState<keyof typeof SERVICES>(initialService in SERVICES ? initialService as keyof typeof SERVICES : "plus");
-  const [referenceType, setReferenceType] = useState<"plate" | "listing">(service === "online" ? "listing" : "plate");
+  const requestedService = params?.get("service") ?? "plus";
+  const initialService = SERVICE_KEYS.includes(requestedService as ServiceKey) ? requestedService as ServiceKey : "plus";
+  const [service, setService] = useState<ServiceKey>(initialService);
+  const [referenceType, setReferenceType] = useState<"plate" | "listing">(initialService === "online" ? "listing" : "plate");
   const [urgency, setUrgency] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const selected = SERVICES[service];
-  const price = useMemo(() => selected.price + (urgency ? 25 : 0), [selected.price, urgency]);
+  const selected = VERIDRIVE_SERVICES[service];
+  const price = useMemo(() => (selected.priceCents + (urgency ? 2500 : 0)) / 100, [selected.priceCents, urgency]);
+  const currentStep = service === "online" ? 2 : 2;
 
   async function submit(form: FormData) {
     setBusy(true);
@@ -77,28 +75,35 @@ export function BookingForm() {
     }
   }
 
-  function handleServiceChange(next: keyof typeof SERVICES) {
+  function handleServiceChange(next: ServiceKey) {
     setService(next);
     if (next === "online") setReferenceType("listing");
   }
 
   return (
     <form action={submit} className="panel form">
+      <div className="full booking-steps" aria-label="Passaggi prenotazione">
+        {STEPS.map((step, index) => (
+          <div key={step} className={`booking-step ${index <= currentStep ? "active" : ""}`}>
+            <span>{index + 1}</span>
+            <small>{step}</small>
+          </div>
+        ))}
+      </div>
+
       <div className="full">
         <label>
           Servizio
-          <select name="service" value={service} onChange={(event) => handleServiceChange(event.target.value as keyof typeof SERVICES)}>
-            <option value="previaggio">Controllo Viaggio — €49</option>
-            <option value="vericert">Check-up + VeriScore — €99</option>
-            <option value="online">Verifica Online — €39</option>
-            <option value="base">Controllo Base — €99</option>
-            <option value="plus">Verifica Plus — €149</option>
+          <select name="service" value={service} onChange={(event) => handleServiceChange(event.target.value as ServiceKey)}>
+            {SERVICE_KEYS.map((key) => (
+              <option key={key} value={key}>{VERIDRIVE_SERVICES[key].name} — €{VERIDRIVE_SERVICES[key].priceCents / 100}</option>
+            ))}
           </select>
         </label>
       </div>
 
       <div className="full">
-        <p><b>1. Come vuoi indicare l'auto?</b></p>
+        <p><b>Come vuoi indicare l'auto?</b></p>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <button type="button" className={`button ${referenceType === "plate" ? "" : "secondary"}`} onClick={() => setReferenceType("plate")}>Targa</button>
           <button type="button" className={`button ${referenceType === "listing" ? "" : "secondary"}`} onClick={() => setReferenceType("listing")}>Link annuncio</button>
@@ -125,7 +130,7 @@ export function BookingForm() {
       )}
 
       <div className="full panel" style={{ marginTop: 8 }}>
-        <p><b>Totale: €{price},00</b></p>
+        <p><b>Totale: €{price.toFixed(2).replace('.', ',')}</b></p>
         <p style={{ marginBottom: 0 }}>{MOVE_POLICY}</p>
       </div>
 
@@ -138,7 +143,8 @@ export function BookingForm() {
 
       {selected.photos && (
         <div className="full panel" style={{ marginTop: 0 }}>
-          <p style={{ marginBottom: 0 }}><b>Foto solamente dei difetti riscontrati.</b></p>
+          <p style={{ marginBottom: 4 }}><b>Verifica Plus</b></p>
+          <p style={{ marginBottom: 0 }}>Foto solamente dei difetti riscontrati e stima indicativa dei costi di riparazione.</p>
         </div>
       )}
 
@@ -149,7 +155,7 @@ export function BookingForm() {
         </div>
       )}
 
-      <button className="button full" disabled={busy} type="submit">{busy ? "Apertura pagamento…" : `Paga €${price},00 e prenota`}</button>
+      <button className="button full" disabled={busy} type="submit">{busy ? "Apertura pagamento…" : `Paga €${price.toFixed(2).replace('.', ',')} e prenota`}</button>
       <p className="full" style={{ fontSize: 14, opacity: 0.78, marginTop: 0 }}>Il pagamento avviene online in modo sicuro. Dopo il pagamento riceverai la conferma della prenotazione.</p>
       {message && <p className="notice full">{message}</p>}
     </form>
