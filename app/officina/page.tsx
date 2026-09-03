@@ -1,19 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, ClipboardList, Euro, Home, Menu, UserRound, Settings, Clock3 } from "lucide-react";
+import { CalendarDays, ClipboardList, Euro, Home, Menu, UserRound, Settings, Clock3, Building2, CheckCircle2 } from "lucide-react";
 import { Header } from "@/components/Header";
 
 const stats = [
-  { label: "Verifiche oggi", value: "4", icon: ClipboardList },
-  { label: "Da completare", value: "2", icon: CalendarDays },
-  { label: "Guadagni mese", value: "€1.020", icon: Euro },
-];
-
-const jobs = [
-  { id: "VD-24091", time: "10:30", car: "Volkswagen Golf 1.5 TSI", plate: "AB123CD", service: "Plus", payout: "€80", status: "Da iniziare" },
-  { id: "VD-24092", time: "14:00", car: "Fiat 500 1.0 Hybrid", plate: "EF456GH", service: "Premium", payout: "€80", status: "In attesa" },
-  { id: "VD-24088", time: "Ieri", car: "BMW 320d", plate: "IL789MN", service: "Plus + Urgenza", payout: "€95", status: "Completata" },
+  { label: "Verifiche oggi", value: "0", icon: ClipboardList },
+  { label: "Da completare", value: "0", icon: CalendarDays },
+  { label: "Guadagni mese", value: "€0", icon: Euro },
 ];
 
 const nav = [
@@ -30,12 +24,10 @@ export default function Officina() {
       <Header />
       <div className="dashboard">
         <aside className="side" style={{ paddingBottom: 96 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 12 }}>
-            <div>
-              <div className="eyebrow">Partner VeriDrive</div>
-              <h2 style={{ marginBottom: 0 }}>Centro Auto Milano</h2>
-            </div>
-            <Menu size={22} aria-hidden />
+          <div style={{ marginBottom: 24 }}>
+            <div className="eyebrow">Partner VeriDrive</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Building2 size={22} /><h2 style={{ margin: 0 }}>VeriDrive Faloppio — Autogerma</h2></div>
+            <p style={{ margin: "6px 0 0", opacity: .7, fontSize: 14 }}>Officina Principale</p>
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             {nav.map(([label, href, Icon]) => (
@@ -47,7 +39,7 @@ export default function Officina() {
           </div>
           <div className="panel" style={{ marginTop: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Settings size={18} /><b>Impostazioni rapide</b></div>
-            <p style={{ margin: "10px 0 6px", fontSize: 14 }}>Massimo 4 verifiche al giorno</p>
+            <p style={{ margin: "10px 0 6px", fontSize: 14 }}>Questa officina usa le stesse regole delle officine partner.</p>
             <Link href="/officina/calendario" style={{ fontSize: 14 }}>Modifica disponibilità</Link>
           </div>
         </aside>
@@ -56,10 +48,10 @@ export default function Officina() {
           <div className="eyebrow">Panoramica officina</div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
-              <h1 style={{ fontSize: "clamp(34px, 5vw, 52px)", marginBottom: 8 }}>Buongiorno, Andrea</h1>
-              <p className="lead" style={{ marginBottom: 0 }}>Hai 2 verifiche da gestire oggi.</p>
+              <h1 style={{ fontSize: "clamp(34px, 5vw, 52px)", marginBottom: 8 }}>Dashboard officina</h1>
+              <p className="lead" style={{ marginBottom: 0 }}>Vista operativa identica a quella dei partner VeriDrive.</p>
             </div>
-            <Link className="button" href="/officina/checklist">Apri prossima pratica</Link>
+            <Link className="button" href="/officina/checklist">Apri una pratica di test</Link>
           </div>
 
           <section style={{ padding: "28px 0 8px" }}>
@@ -77,58 +69,28 @@ export default function Officina() {
             <div className="panel">
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
                 <div>
-                  <div className="eyebrow">Oggi</div>
+                  <div className="eyebrow">Agenda</div>
                   <h3 style={{ marginBottom: 4 }}>Le tue pratiche</h3>
-                  <p style={{ marginBottom: 0, opacity: 0.76 }}>Apri una pratica e lavora direttamente dal telefono o dal PC.</p>
+                  <p style={{ marginBottom: 0, opacity: 0.76 }}>Le prenotazioni reali compariranno qui quando saranno assegnate a questa officina.</p>
                 </div>
-                <Link href="/officina/checklist">Vedi tutte</Link>
+                <Link href="/officina/calendario">Apri calendario</Link>
               </div>
-
-              <div style={{ display: "grid", gap: 12 }}>
-                {jobs.map((job) => (
-                  <div key={job.id} style={{ border: "1px solid rgba(127,127,127,.18)", borderRadius: 18, padding: 16, display: "grid", gap: 12, gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center" }}>
-                    <div>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
-                        <strong>{job.car}</strong>
-                        <span className="badge">{job.service}</span>
-                      </div>
-                      <div style={{ fontSize: 14, opacity: 0.72 }}>{job.id} · {job.plate} · {job.time}</div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                      <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{job.payout}</span>
-                      <span className="badge">{job.status}</span>
-                      {job.status !== "Completata" && <Link className="button secondary" href="/officina/checklist">Apri</Link>}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <div className="notice" style={{ display: "flex", gap: 10, alignItems: "center" }}><CheckCircle2 size={20} /><span>Nessuna prenotazione assegnata al momento.</span></div>
             </div>
           </section>
 
           <section style={{ padding: "0 0 28px" }}>
             <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-              <Link className="card" href="/officina/calendario">
-                <Clock3 size={22} />
-                <h3 style={{ marginTop: 10 }}>Disponibilità</h3>
-                <p>Imposta i singoli orari prenotabili, capacità giornaliera e chiusure.</p>
-              </Link>
-              <Link className="card" href="/officina/guadagni">
-                <Euro size={22} />
-                <h3 style={{ marginTop: 10 }}>Guadagni</h3>
-                <p>Controlla compensi, urgenze e pratiche già liquidate.</p>
-              </Link>
+              <Link className="card" href="/officina/calendario"><Clock3 size={22} /><h3 style={{ marginTop: 10 }}>Disponibilità</h3><p>Imposta gli orari prenotabili, capacità giornaliera e chiusure.</p></Link>
+              <Link className="card" href="/officina/checklist"><ClipboardList size={22} /><h3 style={{ marginTop: 10 }}>Pratica di test</h3><p>Prova checklist, VeriScore, note, foto e chiusura della verifica.</p></Link>
+              <Link className="card" href="/officina/guadagni"><Euro size={22} /><h3 style={{ marginTop: 10 }}>Guadagni</h3><p>Controlla compensi, urgenze e pratiche già liquidate.</p></Link>
             </div>
           </section>
         </main>
       </div>
 
       <nav aria-label="Navigazione officina mobile" style={{ position: "fixed", left: 12, right: 12, bottom: 12, zIndex: 50, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, padding: 8, borderRadius: 20, border: "1px solid rgba(127,127,127,.18)", background: "rgba(255,255,255,.94)", backdropFilter: "blur(16px)", boxShadow: "0 12px 40px rgba(0,0,0,.12)" }}>
-        {nav.slice(0, 4).map(([label, href, Icon]) => (
-          <Link key={href} href={href} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, padding: "9px 4px", fontSize: 12, fontWeight: 600 }}>
-            <Icon size={20} />
-            <span>{label}</span>
-          </Link>
-        ))}
+        {nav.slice(0, 4).map(([label, href, Icon]) => (<Link key={href} href={href} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, padding: "9px 4px", fontSize: 12, fontWeight: 600 }}><Icon size={20} /><span>{label}</span></Link>))}
       </nav>
     </>
   );
