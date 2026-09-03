@@ -9,16 +9,16 @@ export default function Prenota() {
       <Header />
       <main className="page">
         <div className="shell">
-          <div className="eyebrow">Verifica Plus</div>
-          <h1 style={{ fontSize: 48 }}>Prenota la tua verifica</h1>
+          <div className="eyebrow">PRENOTAZIONE VERIDRIVE</div>
+          <h1 style={{ fontSize: "clamp(38px, 6vw, 56px)", marginBottom: 12 }}>Prenota la tua verifica</h1>
           <p className="lead">
-            Indica l'auto, scegli dove si trova e quando vuoi effettuare il controllo. Il pagamento di €99 avviene online prima della conferma.
+            Scegli il servizio, indicaci dove si trova l'auto e quando vuoi effettuare il controllo. Il riepilogo finale mostra il totale prima del pagamento.
           </p>
 
           <div className="panel" style={{ margin: "24px 0" }}>
-            <p style={{ marginBottom: 8 }}><b>Verifica Plus · €99</b></p>
+            <p style={{ marginBottom: 8 }}><b>Servizio e prezzo</b></p>
             <p style={{ marginBottom: 0 }}>
-              <b>Puoi spostare l'appuntamento una sola volta, gratuitamente, almeno 24 ore prima.</b>
+              Il servizio selezionato viene mostrato direttamente nel modulo. Per gli appuntamenti in officina puoi spostare l'appuntamento una sola volta, gratuitamente, almeno 24 ore prima.
             </p>
           </div>
 
