@@ -1,54 +1,91 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ClipboardList, Euro, Home, Menu, UserRound, Settings, Clock3 } from "lucide-react";
+import { CalendarDays, ClipboardList, Euro, Home, UserRound, Settings, Clock3 } from "lucide-react";
 import { Header } from "@/components/Header";
 
-const stats = [
-  { label: "Verifiche oggi", value: "4", icon: ClipboardList },
-  { label: "Da completare", value: "2", icon: CalendarDays },
-  { label: "Guadagni mese", value: "€1.020", icon: Euro },
-];
+type Booking = {
+  id: string;
+  plate: string;
+  vehicle_make: string | null;
+  vehicle_model: string | null;
+  vehicle_year: number | null;
+  requested_date: string | null;
+  requested_slot: string | null;
+  status: string;
+  service_key: string;
+  urgency: boolean;
+  customer_price_cents: number;
+  payout: { amount_cents: number; status: string; paid_at: string | null } | null;
+};
 
-const jobs = [
-  { id: "VD-24091", time: "10:30", car: "Volkswagen Golf 1.5 TSI", plate: "AB123CD", service: "Plus", payout: "€80", status: "Da iniziare" },
-  { id: "VD-24092", time: "14:00", car: "Fiat 500 1.0 Hybrid", plate: "EF456GH", service: "Premium", payout: "€80", status: "In attesa" },
-  { id: "VD-24088", time: "Ieri", car: "BMW 320d", plate: "IL789MN", service: "Plus + Urgenza", payout: "€95", status: "Completata" },
-];
+type DashboardPayload = {
+  workshop: { id: string; name: string; city: string | null; address: string | null; postal_code: string | null };
+  bookings: Booking[];
+};
 
 const nav = [
   ["Panoramica", "/officina", Home],
   ["Calendario", "/officina/calendario", CalendarDays],
-  ["Pratiche", "/officina/checklist", ClipboardList],
+  ["Pratiche", "/officina", ClipboardList],
   ["Guadagni", "/officina/guadagni", Euro],
   ["Profilo", "/officina/profilo", UserRound],
 ] as const;
 
+const SERVICE_NAMES: Record<string, string> = {
+  check_viaggio: "Check Viaggio",
+  veriscore: "Check-up + VeriScore",
+  check_online: "Check Online",
+  veriscore_plus: "Check-up + VeriScorePlus",
+};
+
 export default function Officina() {
+  const [data, setData] = useState<DashboardPayload | null>(null);
+  const [message, setMessage] = useState("");
+
+  async function load() {
+    try {
+      const response = await fetch("/api/workshop/dashboard", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Impossibile caricare la dashboard.");
+      setData(payload);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Impossibile caricare la dashboard.");
+    }
+  }
+
+  useEffect(() => { void load(); }, []);
+
+  const stats = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const todayBookings = data?.bookings.filter((booking) => booking.requested_date === today).length ?? 0;
+    const open = data?.bookings.filter((booking) => ["assigned", "confirmed", "in_progress"].includes(booking.status)).length ?? 0;
+    const due = (data?.bookings ?? []).filter((booking) => booking.payout?.status === "pending").reduce((sum, booking) => sum + (booking.payout?.amount_cents ?? 0), 0);
+    return [
+      { label: "Prenotazioni oggi", value: String(todayBookings), icon: ClipboardList },
+      { label: "Da completare", value: String(open), icon: CalendarDays },
+      { label: "Da liquidare", value: `€${(due / 100).toFixed(2).replace('.', ',')}`, icon: Euro },
+    ];
+  }, [data]);
+
   return (
     <>
       <Header />
       <div className="dashboard">
         <aside className="side" style={{ paddingBottom: 96 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 12 }}>
-            <div>
-              <div className="eyebrow">Partner VeriDrive</div>
-              <h2 style={{ marginBottom: 0 }}>Centro Auto Milano</h2>
-            </div>
-            <Menu size={22} aria-hidden />
+          <div style={{ marginBottom: 24 }}>
+            <div className="eyebrow">Partner VeriDrive</div>
+            <h2 style={{ marginBottom: 4 }}>{data?.workshop ? `VeriDrive ${data.workshop.city ?? ""} — ${data.workshop.name}` : "Officina VeriDrive"}</h2>
+            <p style={{ margin: 0, opacity: .7, fontSize: 14 }}>Dashboard operativa</p>
           </div>
           <div style={{ display: "grid", gap: 8 }}>
-            {nav.map(([label, href, Icon]) => (
-              <Link key={href} href={href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}>
-                <Icon size={19} />
-                {label}
-              </Link>
-            ))}
+            {nav.map(([label, href, Icon]) => <Link key={href} href={href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}><Icon size={19} />{label}</Link>)}
           </div>
           <div className="panel" style={{ marginTop: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Settings size={18} /><b>Impostazioni rapide</b></div>
-            <p style={{ margin: "10px 0 6px", fontSize: 14 }}>Massimo 4 verifiche al giorno</p>
-            <Link href="/officina/calendario" style={{ fontSize: 14 }}>Modifica disponibilità</Link>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Settings size={18} /><b>Operatività</b></div>
+            <p style={{ margin: "10px 0 6px", fontSize: 14 }}>Gestisci disponibilità e chiusure dal calendario.</p>
+            <Link href="/officina/calendario" style={{ fontSize: 14 }}>Apri calendario</Link>
           </div>
         </aside>
 
@@ -56,80 +93,50 @@ export default function Officina() {
           <div className="eyebrow">Panoramica officina</div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
-              <h1 style={{ fontSize: "clamp(34px, 5vw, 52px)", marginBottom: 8 }}>Buongiorno, Andrea</h1>
-              <p className="lead" style={{ marginBottom: 0 }}>Hai 2 verifiche da gestire oggi.</p>
+              <h1 style={{ fontSize: "clamp(34px, 5vw, 52px)", marginBottom: 8 }}>Le tue prenotazioni</h1>
+              <p className="lead" style={{ marginBottom: 0 }}>Lavora sulle pratiche assegnate e chiudi ogni verifica direttamente da qui.</p>
             </div>
-            <Link className="button" href="/officina/checklist">Apri prossima pratica</Link>
+            <Link className="button" href="/officina">Aggiorna</Link>
           </div>
 
           <section style={{ padding: "28px 0 8px" }}>
             <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-              {stats.map(({ label, value, icon: Icon }) => (
-                <div className="metric" key={label} style={{ minHeight: 132 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Icon size={20} />{label}</div>
-                  <strong style={{ marginTop: 12, fontSize: 34 }}>{value}</strong>
-                </div>
-              ))}
+              {stats.map(({ label, value, icon: Icon }) => <div className="metric" key={label} style={{ minHeight: 132 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Icon size={20} />{label}</div><strong style={{ marginTop: 12, fontSize: 34 }}>{value}</strong></div>)}
             </div>
           </section>
 
           <section style={{ padding: "28px 0" }}>
             <div className="panel">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-                <div>
-                  <div className="eyebrow">Oggi</div>
-                  <h3 style={{ marginBottom: 4 }}>Le tue pratiche</h3>
-                  <p style={{ marginBottom: 0, opacity: 0.76 }}>Apri una pratica e lavora direttamente dal telefono o dal PC.</p>
-                </div>
-                <Link href="/officina/checklist">Vedi tutte</Link>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+                <div><div className="eyebrow">Pratiche</div><h3 style={{ marginBottom: 4 }}>Elenco vetture</h3><p style={{ marginBottom: 0, opacity: .76 }}>Visualizzi solo auto e orari necessari per eseguire il servizio.</p></div>
+                <span className="badge">{data?.bookings.length ?? 0} pratiche</span>
               </div>
-
+              {message && <p className="notice">{message}</p>}
               <div style={{ display: "grid", gap: 12 }}>
-                {jobs.map((job) => (
-                  <div key={job.id} style={{ border: "1px solid rgba(127,127,127,.18)", borderRadius: 18, padding: 16, display: "grid", gap: 12, gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center" }}>
+                {(data?.bookings ?? []).length === 0 && <div className="notice">Nessuna pratica assegnata.</div>}
+                {(data?.bookings ?? []).map((booking) => {
+                  const vehicle = [booking.vehicle_make, booking.vehicle_model, booking.vehicle_year].filter(Boolean).join(" ");
+                  const payout = booking.payout ? `€${(booking.payout.amount_cents / 100).toFixed(2).replace('.', ',')}` : "—";
+                  return <div key={booking.id} style={{ border: "1px solid rgba(127,127,127,.18)", borderRadius: 18, padding: 16, display: "grid", gap: 12, gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center" }}>
                     <div>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
-                        <strong>{job.car}</strong>
-                        <span className="badge">{job.service}</span>
-                      </div>
-                      <div style={{ fontSize: 14, opacity: 0.72 }}>{job.id} · {job.plate} · {job.time}</div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}><strong>{vehicle || "Veicolo"}</strong><span className="badge">{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>{booking.urgency && <span className="badge">Urgenza</span>}</div>
+                      <div style={{ fontSize: 14, opacity: .72 }}>{booking.id} · {booking.plate} · {booking.requested_date ?? "Data da definire"} {booking.requested_slot ?? ""}</div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                      <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{job.payout}</span>
-                      <span className="badge">{job.status}</span>
-                      {job.status !== "Completata" && <Link className="button secondary" href="/officina/checklist">Apri</Link>}
-                    </div>
-                  </div>
-                ))}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}><span style={{ fontWeight: 700 }}>{payout}</span><span className="badge">{booking.status}</span><Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Apri</Link></div>
+                  </div>;
+                })}
               </div>
             </div>
           </section>
 
           <section style={{ padding: "0 0 28px" }}>
             <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-              <Link className="card" href="/officina/calendario">
-                <Clock3 size={22} />
-                <h3 style={{ marginTop: 10 }}>Disponibilità</h3>
-                <p>Imposta i singoli orari prenotabili, capacità giornaliera e chiusure.</p>
-              </Link>
-              <Link className="card" href="/officina/guadagni">
-                <Euro size={22} />
-                <h3 style={{ marginTop: 10 }}>Guadagni</h3>
-                <p>Controlla compensi, urgenze e pratiche già liquidate.</p>
-              </Link>
+              <Link className="card" href="/officina/calendario"><Clock3 size={22} /><h3 style={{ marginTop: 10 }}>Disponibilità</h3><p>Imposta gli slot prenotabili, capacità giornaliera e chiusure.</p></Link>
+              <Link className="card" href="/officina/guadagni"><Euro size={22} /><h3 style={{ marginTop: 10 }}>Guadagni</h3><p>Vedi pratiche concluse e compensi ancora da liquidare.</p></Link>
             </div>
           </section>
         </main>
       </div>
-
-      <nav aria-label="Navigazione officina mobile" style={{ position: "fixed", left: 12, right: 12, bottom: 12, zIndex: 50, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, padding: 8, borderRadius: 20, border: "1px solid rgba(127,127,127,.18)", background: "rgba(255,255,255,.94)", backdropFilter: "blur(16px)", boxShadow: "0 12px 40px rgba(0,0,0,.12)" }}>
-        {nav.slice(0, 4).map(([label, href, Icon]) => (
-          <Link key={href} href={href} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, padding: "9px 4px", fontSize: 12, fontWeight: 600 }}>
-            <Icon size={20} />
-            <span>{label}</span>
-          </Link>
-        ))}
-      </nav>
     </>
   );
 }

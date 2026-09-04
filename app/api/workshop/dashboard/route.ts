@@ -1,0 +1,39 @@
+import { NextResponse } from "next/server";
+import { requireWorkshopOwner } from "@/lib/authorization";
+import { createServiceClient } from "@/lib/supabase/service";
+
+export async function GET() {
+  try {
+    const user = await requireWorkshopOwner();
+    const db = createServiceClient();
+    const { data: workshop, error: workshopError } = await db
+      .from("workshops")
+      .select("id,name,city,address,postal_code")
+      .eq("owner_auth_id", user.id)
+      .single();
+    if (workshopError || !workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
+
+    const { data: bookings, error } = await db
+      .from("bookings")
+      .select("id,plate,vehicle_make,vehicle_model,vehicle_year,requested_date,requested_slot,status,service_key,urgency,customer_price_cents,updated_at")
+      .eq("workshop_id", workshop.id)
+      .order("requested_date", { ascending: true });
+    if (error) throw error;
+
+    const bookingIds = (bookings ?? []).map((b) => b.id);
+    const { data: payouts } = bookingIds.length
+      ? await db.from("payouts").select("booking_id,amount_cents,status,paid_at").in("booking_id", bookingIds)
+      : { data: [] };
+    const payoutByBooking = new Map((payouts ?? []).map((p) => [p.booking_id, p]));
+
+    const enriched = (bookings ?? []).map((booking) => ({
+      ...booking,
+      payout: payoutByBooking.get(booking.id) ?? null,
+    }));
+
+    return NextResponse.json({ workshop, bookings: enriched });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Non autorizzato";
+    return NextResponse.json({ error: message }, { status: 401 });
+  }
+}
