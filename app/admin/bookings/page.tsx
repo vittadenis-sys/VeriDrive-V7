@@ -31,16 +31,16 @@ export default function AdminBookings() {
 
   useEffect(() => { void load(); }, []);
 
-  async function loadSlots(booking: Booking, workshopList: Workshop[]) {
+  async function loadSlots(booking: Booking) {
     if (!booking.requested_date) return;
-    const updated = await Promise.all(workshopList.map(async (workshop) => {
-      const response = await fetch(`/api/bookings/availability?service=${encodeURIComponent(booking.service_key)}&date=${encodeURIComponent(booking.requested_date!)}&urgency=${booking.urgency}`);
-      if (!response.ok) return workshop;
-      const data = await response.json();
-      const found = (data.workshops ?? []).find((item: Workshop) => item.id === workshop.id);
+    const response = await fetch(`/api/bookings/availability?service=${encodeURIComponent(booking.service_key)}&date=${encodeURIComponent(booking.requested_date)}&urgency=${booking.urgency}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    const availability = data.workshops ?? [];
+    setWorkshops((current) => current.map((workshop) => {
+      const found = availability.find((item: Workshop) => item.id === workshop.id);
       return { ...workshop, availableSlots: found?.availableSlots ?? [] };
     }));
-    setWorkshops(updated);
   }
 
   async function assign(workshopId: string, slot: string) {
@@ -58,13 +58,13 @@ export default function AdminBookings() {
 
   const current = bookings.find((b) => b.id === selectedBooking) ?? null;
 
-  useEffect(() => { if (current) void loadSlots(current, workshops); }, [selectedBooking]);
+  useEffect(() => { if (current) void loadSlots(current); }, [selectedBooking]);
 
   return <><Header/><main className="page"><div className="shell">
     <Link href="/admin">← Amministrazione</Link>
     <div className="eyebrow" style={{ marginTop: 24 }}>Gestione pratiche</div>
     <h1 style={{ fontSize: "clamp(38px,6vw,54px)" }}>Assegnazione officina</h1>
-    <p className="lead">Scegli una pratica e assegna un'officina attiva mostrando solo gli slot disponibili.</p>
+    <p className="lead">Scegli una pratica e assegna un'officina attiva mostrando solo gli slot realmente disponibili.</p>
     {message && <p className="notice">{message}</p>}
     <section className="panel" style={{ marginTop: 24 }}>
       <label>Pratica<select value={selectedBooking} onChange={(e)=>setSelectedBooking(e.target.value)}><option value="">Seleziona una pratica</option>{bookings.filter(b=>b.status !== "completed" && b.status !== "cancelled").map((b)=><option key={b.id} value={b.id}>{b.id} · {b.plate} · {SERVICE_NAMES[b.service_key] ?? b.service_key}</option>)}</select></label>
