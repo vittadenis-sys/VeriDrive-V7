@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Header } from "@/components/Header";
 
 type Workshop = { id: string; display_name: string; city: string | null; address: string | null; postal_code: string | null; availableSlots: string[] };
-type Booking = { id: string; plate: string; vehicle_make: string | null; vehicle_model: string | null; requested_date: string | null; requested_slot: string | null; service_key: string; urgency: boolean; workshop_id: string | null };
+type Booking = { id: string; plate: string; vehicle_make: string | null; vehicle_model: string | null; requested_date: string | null; requested_slot: string | null; status: string; service_key: string; urgency: boolean; workshop_id: string | null };
 
 const SERVICE_NAMES: Record<string,string> = { check_viaggio: "Check Viaggio", veriscore: "Check-up + VeriScore", check_online: "Check Online", veriscore_plus: "Check-up + VeriScorePlus" };
 
@@ -26,7 +26,7 @@ export default function AdminBookings() {
     if (bookingResponse.ok) setBookings(bookingData.bookings ?? []);
     else setMessage(bookingData.error ?? "Impossibile caricare le pratiche.");
     if (workshopResponse.ok) setWorkshops((workshopData.workshops ?? []).map((w: Workshop) => ({ ...w, availableSlots: [] })));
-    else if (!message) setMessage(workshopData.error ?? "Impossibile caricare le officine.");
+    else setMessage(workshopData.error ?? "Impossibile caricare le officine.");
   }
 
   useEffect(() => { void load(); }, []);
@@ -68,7 +68,7 @@ export default function AdminBookings() {
     {message && <p className="notice">{message}</p>}
     <section className="panel" style={{ marginTop: 24 }}>
       <label>Pratica<select value={selectedBooking} onChange={(e)=>setSelectedBooking(e.target.value)}><option value="">Seleziona una pratica</option>{bookings.filter(b=>b.status !== "completed" && b.status !== "cancelled").map((b)=><option key={b.id} value={b.id}>{b.id} · {b.plate} · {SERVICE_NAMES[b.service_key] ?? b.service_key}</option>)}</select></label>
-      {current && <div style={{ marginTop: 18 }}><div className="card"><strong>{[current.vehicle_make,current.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</strong><p style={{ marginBottom: 4 }}>{current.plate} · {current.requested_date ?? "Data non impostata"} {current.requested_slot ?? ""}</p><span className="badge">{current.urgency ? "Urgenza" : "Standard"}</span></div></div>}
+      {current && <div style={{ marginTop: 18 }}><div className="card"><strong>{[current.vehicle_make,current.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</strong><p style={{ marginBottom: 4 }}>{current.plate} · {current.requested_date ?? "Data non impostata"} {current.requested_slot ?? ""}</p><span className="badge">{current.urgency ? "Urgenza" : "Standard"}</span><div style={{ marginTop:8,fontSize:13,opacity:.75 }}>Stato: {current.status} · {current.workshop_id ? "Officina già assegnata" : "In attesa di assegnazione"}</div></div></div>}
     </section>
     <section style={{ padding: "28px 0" }}>
       <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))" }}>
