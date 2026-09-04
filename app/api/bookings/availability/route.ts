@@ -18,8 +18,14 @@ export async function GET(request: Request) {
   const urgency = url.searchParams.get("urgency") === "true";
   if (!SERVICE_KEYS.includes(serviceKey) || !getService(serviceKey)) return NextResponse.json({ error: "Servizio non valido." }, { status: 400 });
   const service = getService(serviceKey)!;
-  if (!service.workshop) return NextResponse.json({ online: true, workshops: [] });
+  if (!service.workshop) return NextResponse.json({ online: true, workshops: [], priceCents: service.priceCents });
   if (!isValidDate(date)) return NextResponse.json({ error: "Data non valida." }, { status: 400 });
+
+  const requested = new Date(`${date}T12:00:00`);
+  const minAdvanceHours = urgency ? 24 : 48;
+  if (requested.getTime() - Date.now() < minAdvanceHours * 60 * 60 * 1000) {
+    return NextResponse.json({ error: urgency ? "L'urgenza richiede almeno 24 ore di preavviso." : "Gli appuntamenti standard richiedono almeno 48 ore di preavviso." }, { status: 400 });
+  }
 
   const { data: workshops, error: workshopError } = await supabase
     .from("workshops")
@@ -28,7 +34,7 @@ export async function GET(request: Request) {
     .order("city", { ascending: true });
   if (workshopError) return NextResponse.json({ error: workshopError.message }, { status: 400 });
 
-  const weekday = new Date(`${date}T12:00:00`).getDay() || 7;
+  const weekday = requested.getDay() || 7;
   const results = [];
   for (const workshop of workshops ?? []) {
     const { data: settings } = await supabase.from("workshop_settings").select("max_daily_inspections,accepts_urgent").eq("workshop_id", workshop.id).maybeSingle();
