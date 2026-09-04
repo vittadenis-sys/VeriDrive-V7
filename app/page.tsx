@@ -15,6 +15,10 @@ const purchaseServices = [
   { href: "/acquisto-auto-usata#veriscoreplus", name: "Check-up + VeriScorePlus", price: "149 €", description: "Verifica completa + foto dei difetti e stima indicativa dei costi." },
 ];
 
+function BookingLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return <Link className="button" href={href}>{children}</Link>;
+}
+
 export default function Home() {
   return (
     <>
@@ -30,7 +34,7 @@ export default function Home() {
               <div className="trust-row"><div><ShieldCheck size={18} /> Controlli indipendenti</div><div><Gauge size={18} /> VeriScore</div><div><QrCode size={18} /> Certificato verificabile</div></div>
             </div>
             <div className="hero-visual" aria-label="Anteprima controllo auto VeriDrive">
-              <div className="inspection-scene"><div className="scene-glow" /><div className="inspection-car"><div className="car-roof" /><div className="car-body" /><div className="wheel wheel-a" /><div className="wheel wheel-b" /><div className="headlight" /></div><div className="inspection-card"><div className="inspection-card-top"><span>VERIDRIVE CHECK</span><span>VERIFICATO</span></div><VeriScore score={92} size={118} /><div className="inspection-row"><ShieldCheck size={18} /><span>Controlli</span><strong>48/50</strong></div><div className="inspection-row"><QrCode size={18} /><span>Certificato</span><strong>QR</strong></div></div></div>
+              <div className="inspection-scene"><div className="scene-glow" /><div className="inspection-car"><div className="car-roof" /><div className="car-body" /><div className="wheel wheel-a" /><div className="wheel wheel-b" /><div className="headlight" /></div><div className="inspection-card"><div className="inspection-card-top"><span>VERIDRIVE CHECK</span><span>ANTEPRIMA</span></div><VeriScore score={92} size={118} /><div className="inspection-row"><ShieldCheck size={18} /><span>Controlli</span><strong>50 punti</strong></div><div className="inspection-row"><QrCode size={18} /><span>Certificato</span><strong>QR</strong></div></div></div>
               <div className="hero-note"><span>✓</span> Metodo standardizzato · risultato chiaro · verifica online</div>
             </div>
           </div>
@@ -38,13 +42,13 @@ export default function Home() {
 
         <section id="percorsi"><div className="shell"><div className="eyebrow">SCEGLI IL TUO PERCORSO</div><h2>Da dove vuoi partire?</h2><p className="lead">Scegli la situazione che ti riguarda.</p>
           <div className="journeys">
-            <article className="journey card"><div className="journey-heading"><div className="icon"><CarFront size={24} /></div><div><div className="eyebrow">LA TUA AUTO</div><h3>Hai già un'auto</h3></div></div><div className="service-list">{ownerServices.map((service)=><Link key={service.href} className="service-item" href={service.href}><div><strong>{service.name}</strong><span>{service.description}</span></div><div className="service-price">{service.price}<ArrowRight size={18}/></div></Link>)}</div></article>
-            <article className="journey card"><div className="journey-heading"><div className="icon"><SearchCheck size={24} /></div><div><div className="eyebrow">STAI ACQUISTANDO UN'AUTO</div><h3>Devi comprarla</h3></div></div><div className="service-list">{purchaseServices.map((service)=><Link key={service.href} className={`service-item ${service.featured?"featured":""}`} href={service.href}><div>{service.featured&&<span className="recommended">PIÙ SCELTA</span>}<strong>{service.name}</strong><span>{service.description}</span></div><div className="service-price">{service.price}<ArrowRight size={18}/></div></Link>)}</div></article>
+            <article className="journey card"><div className="journey-heading"><div className="icon"><CarFront size={24} /></div><div><div className="eyebrow">LA TUA AUTO</div><h3>Hai già un'auto</h3></div></div><div className="service-list">{ownerServices.map(service=><Link key={service.href} className="service-item" href={service.href}><div><strong>{service.name}</strong><span>{service.description}</span></div><div className="service-price">{service.price}<ArrowRight size={18}/></div></Link>)}</div></article>
+            <article className="journey card"><div className="journey-heading"><div className="icon"><SearchCheck size={24} /></div><div><div className="eyebrow">STAI ACQUISTANDO UN'AUTO</div><h3>Devi comprarla</h3></div></div><div className="service-list">{purchaseServices.map(service=><Link key={service.href} className={`service-item ${service.featured?"featured":""}`} href={service.href}><div>{service.featured&&<span className="recommended">PIÙ SCELTA</span>}<strong>{service.name}</strong><span>{service.description}</span></div><div className="service-price">{service.price}<ArrowRight size={18}/></div></Link>)}</div></article>
           </div>
         </div></section>
 
-        <section className="panel-section veriscore-section"><div className="shell veriscore-showcase"><div><div className="eyebrow">VERISCORE®</div><h2>Un numero per capire subito il risultato.</h2><p className="lead">Il VeriScore sintetizza l'esito della verifica in un formato chiaro e leggibile.</p></div><div className="veriscore-demo card"><VeriScore score={92} size={176}/><div><strong>92/100</strong><span>Anteprima del risultato</span><small>Il punteggio reale viene generato dalla verifica.</small></div></div></div></section>
-        <section className="panel"><div className="shell cta-panel"><div><div className="eyebrow">PRONTO?</div><h2>Conosci prima. Decidi meglio.</h2><p>Seleziona il servizio più adatto alla tua situazione.</p></div><Link className="button" href="/prenota">Prenota <ArrowRight size={18}/></Link></div></section>
+        <section className="panel-section veriscore-section"><div className="shell veriscore-showcase"><div><div className="eyebrow">VERISCORE®</div><h2>Un numero per capire subito il risultato.</h2><p className="lead">Il VeriScore sintetizza l'esito della verifica in un formato chiaro e leggibile.</p></div><div className="veriscore-demo card"><VeriScore score={92} size={176}/><div><strong>92/100</strong><span>Anteprima grafica</span><small>Il punteggio reale viene generato dalla checklist della verifica.</small></div></div></div></section>
+        <section className="panel"><div className="shell cta-panel"><div><div className="eyebrow">PRONTO?</div><h2>Conosci prima. Decidi meglio.</h2><p>Seleziona il servizio più adatto alla tua situazione.</p></div><BookingLink href="/prenota">Prenota <ArrowRight size={18}/></BookingLink></div></section>
       </main><Footer/>
     </>
   );
