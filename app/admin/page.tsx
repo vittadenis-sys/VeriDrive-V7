@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, FileText, ReceiptText, Users } from "lucide-react";
+import { ArrowRight, Building2, FileText, ReceiptText, Users, Wrench } from "lucide-react";
 import { Header } from "@/components/Header";
 
 const adminSections = [
@@ -14,15 +14,20 @@ export default function Admin() {
     <Header />
     <main className="page">
       <div className="shell">
-        <div className="eyebrow">Amministrazione VeriDrive</div>
-        <h1 style={{ fontSize: "clamp(38px, 6vw, 56px)" }}>Controllo operativo</h1>
-        <p className="lead">Un solo pannello per ordini, officine, commercianti e liquidazioni.</p>
+        <div className="eyebrow">AMMINISTRAZIONE VERIDRIVE</div>
+        <div className="dashboard-hero">
+          <div>
+            <h1>Controllo operativo</h1>
+            <p className="lead">Ordini, officine, commercianti e liquidazioni in un solo pannello.</p>
+          </div>
+          <Link className="button" href="/officina"><Wrench size={18} /> La mia officina</Link>
+        </div>
 
-        <section style={{ padding: "28px 0 8px" }}>
+        <section style={{ padding: "28px 0 12px" }}>
           <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))" }}>
-            <div className="metric"><span>Stato incassi</span><strong>Gestiti per pratica</strong></div>
-            <div className="metric"><span>Stato officine</span><strong>Da chiudere / liquidare</strong></div>
-            <div className="metric"><span>Fatturazione</span><strong>Da verificare</strong></div>
+            <div className="metric"><span>Incassi cliente</span><strong>Gestiti per pratica</strong></div>
+            <div className="metric"><span>Compensi officina</span><strong>Solo a verifica chiusa</strong></div>
+            <div className="metric"><span>Fatture officina</span><strong>Da ricevere / registrare</strong></div>
           </div>
         </section>
 
@@ -34,19 +39,20 @@ export default function Admin() {
               <p>{text}</p>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Apri <ArrowRight size={16} /></span>
             </Link>)}
-            <a className="card" href="/api/admin/export?table=bookings">
-              <ReceiptText size={24} />
-              <h3 style={{ marginTop: 10 }}>Esporta prenotazioni</h3>
-              <p>Scarica il registro delle prenotazioni in CSV.</p>
-              <span>Esporta →</span>
-            </a>
           </div>
         </section>
 
-        <div className="panel" style={{ marginTop: 8 }}>
+        <section className="panel" style={{ marginTop: 8 }}>
+          <div className="eyebrow">TUA OFFICINA</div>
+          <h3>VeriDrive Faloppio — Autogerma</h3>
+          <p style={{ marginBottom: 12 }}>La tua officina utilizza la stessa dashboard operativa prevista per tutti i partner: calendario, pratiche, checklist e liquidazioni.</p>
+          <Link href="/officina">Apri dashboard officina →</Link>
+        </section>
+
+        <section className="panel" style={{ marginTop: 18 }}>
           <h3>Regola di pagamento officina</h3>
-          <p style={{ marginBottom: 0 }}>Il pagamento al partner matura solo dopo la chiusura della verifica. La liquidazione resta poi sospesa finché l'amministrazione non registra la fattura ricevuta.</p>
-        </div>
+          <p style={{ marginBottom: 0 }}>Il compenso matura solo dopo la chiusura della verifica. La liquidazione resta sospesa finché l'amministrazione non registra la fattura ricevuta.</p>
+        </section>
       </div>
     </main>
   </>;

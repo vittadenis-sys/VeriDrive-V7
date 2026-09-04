@@ -1,7 +1,7 @@
 import Link from "next/link";
+import { CalendarDays, FileCheck2, Gauge, Plus, ShieldCheck, Wrench } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { CalendarDays, FileCheck2, Gauge, Plus, ShieldCheck } from "lucide-react";
 
 const checks = [
   { name: "Volkswagen Golf 1.5 TSI", score: 92, date: "25 agosto 2026", status: "Certificato disponibile" },
@@ -26,7 +26,7 @@ export default function Dashboard() {
             <div>
               <div className="eyebrow">AREA CLIENTE</div>
               <h1>Le tue verifiche.</h1>
-              <p className="lead">Tutto quello che hai verificato, raccolto in un unico posto.</p>
+              <p className="lead">Pratiche, risultati e certificati raccolti in un unico posto.</p>
             </div>
             <Link className="button" href="/prenota"><Plus size={18} /> Nuova verifica</Link>
           </div>
@@ -56,6 +56,12 @@ export default function Dashboard() {
                 </article>
               ))}
             </div>
+          </section>
+
+          <section className="cards" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", padding: "10px 0 28px" }}>
+            <Link className="card" href="/auto"><Gauge size={22} /><h3 style={{ marginTop: 10 }}>La tua auto</h3><p>Check Viaggio e Check-up + VeriScore per l'auto che utilizzi.</p></Link>
+            <Link className="card" href="/acquisto-auto-usata"><FileCheck2 size={22} /><h3 style={{ marginTop: 10 }}>Stai acquistando un'auto</h3><p>Check Online, verifica in officina e VeriScorePlus per un'auto che stai valutando.</p></Link>
+            <Link className="card" href="/officina"><Wrench size={22} /><h3 style={{ marginTop: 10 }}>Dashboard officina</h3><p>Accesso operativo alla dashboard officina, disponibile per gli account abilitati.</p></Link>
           </section>
 
           <section className="panel customer-info">

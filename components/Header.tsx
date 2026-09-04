@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 export function Header(){
   return (
     <header>
       <div className="shell nav">
         <Link href="/" className="logo" aria-label="VeriDrive home">veri<span>drive</span></Link>
+        <input id="veridrive-menu" className="mobile-menu-toggle" type="checkbox" aria-label="Apri menu" />
+        <label htmlFor="veridrive-menu" className="mobile-menu-button" aria-label="Apri menu"><Menu size={22} /><X size={22} /></label>
         <nav aria-label="Navigazione principale">
           <Link href="/#percorsi">Servizi</Link>
           <Link href="/auto">La tua auto</Link>
@@ -13,8 +15,9 @@ export function Header(){
           <Link href="/officina">Officine</Link>
           <Link href="/commercianti">Commercianti</Link>
           <Link href="/dashboard">Area Cliente</Link>
+          <Link href="/admin">Admin</Link>
         </nav>
-        <Link className="button" href="/prenota">Prenota</Link>
+        <Link className="button nav-cta" href="/prenota">Prenota</Link>
       </div>
     </header>
   );
