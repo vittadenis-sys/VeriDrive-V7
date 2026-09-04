@@ -5,19 +5,15 @@ import { Footer } from "@/components/Footer";
 import { VeriScore } from "@/components/VeriScore";
 
 const ownerServices = [
-  { href: "/auto#viaggio", name: "Check Viaggio", price: "49 €", description: "Controllo essenziale prima di partire." },
-  { href: "/auto#checkup", name: "Check-up + VeriScore", price: "99 €", description: "50 controlli, VeriScore e certificato digitale." },
+  { href: "/prenota?service=check_viaggio&path=own_car", name: "Check Viaggio", price: "49 €", description: "Controllo essenziale prima di partire." },
+  { href: "/prenota?service=veriscore&path=own_car", name: "Check-up + VeriScore", price: "99 €", description: "50 controlli, VeriScore e certificato digitale." },
 ];
 
 const purchaseServices = [
-  { href: "/acquisto-auto-usata#online", name: "Check Online", price: "39 €", description: "Analisi dell'annuncio con risposta entro 24 ore." },
-  { href: "/acquisto-auto-usata#checkup", name: "Check-up + VeriScore", price: "99 €", description: "Verifica completa in officina, VeriScore e certificato.", featured: true },
-  { href: "/acquisto-auto-usata#veriscoreplus", name: "Check-up + VeriScorePlus", price: "149 €", description: "Verifica completa + foto dei difetti e stima indicativa dei costi." },
+  { href: "/prenota?service=check_online&path=buying_used", name: "Check Online", price: "39 €", description: "Analisi dell'annuncio con risposta entro 24 ore." },
+  { href: "/prenota?service=veriscore&path=buying_used", name: "Check-up + VeriScore", price: "99 €", description: "Verifica completa in officina, VeriScore e certificato.", featured: true },
+  { href: "/prenota?service=veriscore_plus&path=buying_used", name: "Check-up + VeriScorePlus", price: "149 €", description: "Verifica completa + foto dei difetti e stima indicativa dei costi." },
 ];
-
-function BookingLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return <Link className="button" href={href}>{children}</Link>;
-}
 
 export default function Home() {
   return (
@@ -48,7 +44,7 @@ export default function Home() {
         </div></section>
 
         <section className="panel-section veriscore-section"><div className="shell veriscore-showcase"><div><div className="eyebrow">VERISCORE®</div><h2>Un numero per capire subito il risultato.</h2><p className="lead">Il VeriScore sintetizza l'esito della verifica in un formato chiaro e leggibile.</p></div><div className="veriscore-demo card"><VeriScore score={92} size={176}/><div><strong>92/100</strong><span>Anteprima grafica</span><small>Il punteggio reale viene generato dalla checklist della verifica.</small></div></div></div></section>
-        <section className="panel"><div className="shell cta-panel"><div><div className="eyebrow">PRONTO?</div><h2>Conosci prima. Decidi meglio.</h2><p>Seleziona il servizio più adatto alla tua situazione.</p></div><BookingLink href="/prenota">Prenota <ArrowRight size={18}/></BookingLink></div></section>
+        <section className="panel"><div className="shell cta-panel"><div><div className="eyebrow">PRONTO?</div><h2>Conosci prima. Decidi meglio.</h2><p>Seleziona il servizio più adatto alla tua situazione.</p></div><Link className="button" href="/prenota">Prenota <ArrowRight size={18}/></Link></div></section>
       </main><Footer/>
     </>
   );
