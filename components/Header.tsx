@@ -1,23 +1,49 @@
-import Link from "next/link";
-import { Menu } from "lucide-react";
+"use client";
 
-export function Header(){
+import Link from "next/link";
+import { useState } from "react";
+import { Menu, X } from "lucide-react";
+
+const links = [
+  ["Servizi", "/#percorsi"],
+  ["La tua auto", "/auto"],
+  ["Stai acquistando un'auto", "/acquisto-auto-usata"],
+  ["Officine", "/officina"],
+  ["Commercianti", "/commercianti"],
+  ["Area Cliente", "/dashboard"],
+  ["Admin", "/admin"],
+] as const;
+
+export function Header() {
+  const [open, setOpen] = useState(false);
+
+  function close() {
+    setOpen(false);
+  }
+
   return (
     <header>
       <div className="shell nav">
-        <Link href="/" className="logo" aria-label="VeriDrive home">veri<span>drive</span></Link>
-        <input id="veridrive-menu" className="mobile-menu-toggle" type="checkbox" aria-label="Apri menu" />
-        <label htmlFor="veridrive-menu" className="mobile-menu-button" aria-label="Apri menu"><Menu size={22} /></label>
-        <nav aria-label="Navigazione principale">
-          <Link href="/#percorsi">Servizi</Link>
-          <Link href="/auto">La tua auto</Link>
-          <Link href="/acquisto-auto-usata">Stai acquistando un'auto</Link>
-          <Link href="/officina">Officine</Link>
-          <Link href="/commercianti">Commercianti</Link>
-          <Link href="/dashboard">Area Cliente</Link>
-          <Link href="/admin">Admin</Link>
+        <Link href="/" className="logo" aria-label="VeriDrive home" onClick={close}>veri<span>drive</span></Link>
+
+        <button
+          type="button"
+          className="mobile-menu-button"
+          aria-label={open ? "Chiudi menu" : "Apri menu"}
+          aria-expanded={open}
+          aria-controls="veridrive-main-nav"
+          onClick={() => setOpen((current) => !current)}
+        >
+          {open ? <X size={24} aria-hidden="true" /> : <Menu size={24} aria-hidden="true" />}
+        </button>
+
+        <nav id="veridrive-main-nav" className={open ? "mobile-nav-open" : ""} aria-label="Navigazione principale">
+          {links.map(([label, href]) => (
+            <Link key={href} href={href} onClick={close}>{label}</Link>
+          ))}
         </nav>
-        <Link className="button nav-cta" href="/prenota">Prenota</Link>
+
+        <Link className="button nav-cta" href="/prenota" onClick={close}>Prenota</Link>
       </div>
     </header>
   );
