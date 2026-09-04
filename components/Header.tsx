@@ -7,24 +7,12 @@ export function Header(){
       <div className="shell nav">
         <Link href="/" className="logo" aria-label="VeriDrive home">veri<span>drive</span></Link>
         <nav aria-label="Navigazione principale">
-          <div className="nav-group">
-            <Link href="/auto">Auto privata <ChevronDown size={13} /></Link>
-            <div className="nav-menu">
-              <Link href="/auto#viaggio">Controllo Viaggio · 49 €</Link>
-              <Link href="/auto#checkup">Check-up + VeriScore · 99 €</Link>
-            </div>
-          </div>
-          <div className="nav-group">
-            <Link href="/acquisto-auto-usata">Acquisto usato <ChevronDown size={13} /></Link>
-            <div className="nav-menu">
-              <Link href="/acquisto-auto-usata#online">Verifica Online · 39 €</Link>
-              <Link href="/acquisto-auto-usata#base">Controllo Base · 99 €</Link>
-              <Link href="/acquisto-auto-usata#plus">Verifica Plus · 149 €</Link>
-            </div>
-          </div>
+          <Link href="/#percorsi">Servizi</Link>
+          <Link href="/auto">La tua auto</Link>
+          <Link href="/acquisto-auto-usata">Stai acquistando un'auto</Link>
           <Link href="/officina">Officine</Link>
           <Link href="/commercianti">Commercianti</Link>
-          <Link href="/dashboard">Area clienti</Link>
+          <Link href="/dashboard">Area Cliente</Link>
         </nav>
         <Link className="button" href="/prenota">Prenota</Link>
       </div>
