@@ -11,6 +11,15 @@ function isValidDate(value: unknown) {
   return !Number.isNaN(parsed.getTime());
 }
 
+function createPracticeNumber() {
+  const stamp = new Date();
+  const yyyy = stamp.getFullYear();
+  const mm = String(stamp.getMonth() + 1).padStart(2, "0");
+  const dd = String(stamp.getDate()).padStart(2, "0");
+  const suffix = String(Math.floor(Math.random() * 900) + 100);
+  return `VRD-${yyyy}${mm}${dd}-${suffix}`;
+}
+
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 }); }
@@ -32,7 +41,7 @@ export async function POST(request: Request) {
   if (customerPriceCents == null) return NextResponse.json({ error: "Impossibile calcolare il prezzo." }, { status: 400 });
 
   const referenceType = body.referenceType === "listing" ? "listing" : "plate";
-  const reference = referenceType === "plate" ? String(body.plate ?? "").trim() : String(body.listingUrl ?? "").trim();
+  const reference = referenceType === "plate" ? String(body.plate ?? "").trim().toUpperCase() : String(body.listingUrl ?? "").trim();
   if (!reference) return NextResponse.json({ error: referenceType === "plate" ? "Targa mancante." : "Link annuncio mancante." }, { status: 400 });
 
   const date = isOnline ? null : String(body.date ?? "").trim();
@@ -42,6 +51,7 @@ export async function POST(request: Request) {
   if (!isOnline && !slot) return NextResponse.json({ error: "Orario mancante." }, { status: 400 });
   if (service.workshop && !location) return NextResponse.json({ error: "Indica dove si trova l'auto." }, { status: 400 });
 
+  const practiceNumber = createPracticeNumber();
   const insertPayload = {
     customer_id: customer.id,
     plate: referenceType === "plate" ? reference : "DA-LINK",
@@ -61,5 +71,5 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   await sendBookingConfirmation(user.email ?? "", data.id);
-  return NextResponse.json({ bookingId: data.id });
+  return NextResponse.json({ bookingId: data.id, practiceNumber, service: service.key });
 }
