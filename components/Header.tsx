@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu } from "lucide-react";
 
 export function Header(){
   return (
@@ -7,7 +7,7 @@ export function Header(){
       <div className="shell nav">
         <Link href="/" className="logo" aria-label="VeriDrive home">veri<span>drive</span></Link>
         <input id="veridrive-menu" className="mobile-menu-toggle" type="checkbox" aria-label="Apri menu" />
-        <label htmlFor="veridrive-menu" className="mobile-menu-button" aria-label="Apri menu"><Menu size={22} /><X size={22} /></label>
+        <label htmlFor="veridrive-menu" className="mobile-menu-button" aria-label="Apri menu"><Menu size={22} /></label>
         <nav aria-label="Navigazione principale">
           <Link href="/#percorsi">Servizi</Link>
           <Link href="/auto">La tua auto</Link>

@@ -19,6 +19,10 @@ export async function PATCH(request: Request) {
     if (bookingError || !booking || booking.workshop_id !== workshop.id) return NextResponse.json({ error: "Pratica non trovata." }, { status: 404 });
 
     if (toStatus === "completed") {
+      const { data: inspection } = await db.from("inspections").select("id,passed_checks").eq("booking_id", bookingId).maybeSingle();
+      if (!inspection || inspection.passed_checks !== 50) {
+        return NextResponse.json({ error: "Completa tutti i 50 controlli prima di chiudere la verifica." }, { status: 400 });
+      }
       const { error } = await db.rpc("close_booking_as_workshop", { p_booking_id: bookingId });
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     } else {
