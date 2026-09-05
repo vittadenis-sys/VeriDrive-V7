@@ -40,11 +40,23 @@ const SERVICE_NAMES: Record<string, string> = {
   veriscore_plus: "Check-up + VeriScorePlus",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  requested: "Richiesta",
+  assigned: "Assegnata",
+  confirmed: "Confermata",
+  in_progress: "In lavorazione",
+  completed: "Conclusa",
+  cancelled: "Annullata",
+  refunded: "Rimborsata",
+};
+
 export default function Officina() {
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [message, setMessage] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function load() {
+    setMessage("");
     try {
       const response = await fetch("/api/workshop/dashboard", { cache: "no-store" });
       const payload = await response.json();
@@ -68,6 +80,24 @@ export default function Officina() {
       { label: "Da liquidare", value: `€${(due / 100).toFixed(2).replace('.', ',')}`, icon: Euro },
     ];
   }, [data]);
+
+  async function changeStatus(id: string, toStatus: "confirmed" | "in_progress") {
+    setBusyId(id); setMessage("");
+    try {
+      const response = await fetch("/api/workshop/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: id, toStatus }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Impossibile aggiornare la pratica.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Impossibile aggiornare la pratica.");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <>
@@ -94,9 +124,9 @@ export default function Officina() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
               <h1 style={{ fontSize: "clamp(34px, 5vw, 52px)", marginBottom: 8 }}>Le tue prenotazioni</h1>
-              <p className="lead" style={{ marginBottom: 0 }}>Lavora sulle pratiche assegnate e chiudi ogni verifica direttamente da qui.</p>
+              <p className="lead" style={{ marginBottom: 0 }}>Lavora sulle pratiche assegnate e avvia la verifica direttamente da qui.</p>
             </div>
-            <Link className="button" href="/officina">Aggiorna</Link>
+            <button type="button" className="button" onClick={() => void load()}>Aggiorna</button>
           </div>
 
           <section style={{ padding: "28px 0 8px" }}>
@@ -108,7 +138,7 @@ export default function Officina() {
           <section style={{ padding: "28px 0" }}>
             <div className="panel">
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-                <div><div className="eyebrow">Pratiche</div><h3 style={{ marginBottom: 4 }}>Elenco vetture</h3><p style={{ marginBottom: 0, opacity: .76 }}>Visualizzi solo auto e orari necessari per eseguire il servizio.</p></div>
+                <div><div className="eyebrow">Pratiche</div><h3 style={{ marginBottom: 4 }}>Elenco vetture</h3><p style={{ marginBottom: 0, opacity: .76 }}>Solo pratiche assegnate a questa officina.</p></div>
                 <span className="badge">{data?.bookings.length ?? 0} pratiche</span>
               </div>
               {message && <p className="notice">{message}</p>}
@@ -120,9 +150,16 @@ export default function Officina() {
                   return <div key={booking.id} style={{ border: "1px solid rgba(127,127,127,.18)", borderRadius: 18, padding: 16, display: "grid", gap: 12, gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center" }}>
                     <div>
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}><strong>{vehicle || "Veicolo"}</strong><span className="badge">{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>{booking.urgency && <span className="badge">Urgenza</span>}</div>
-                      <div style={{ fontSize: 14, opacity: .72 }}>{booking.id} · {booking.plate} · {booking.requested_date ?? "Data da definire"} {booking.requested_slot ?? ""}</div>
+                      <div style={{ fontSize: 14, opacity: .72 }}>{booking.plate} · {booking.requested_date ?? "Data da definire"} {booking.requested_slot ?? ""}</div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}><span style={{ fontWeight: 700 }}>{payout}</span><span className="badge">{booking.status}</span><Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Apri</Link></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <span className="badge">{STATUS_LABELS[booking.status] ?? booking.status}</span>
+                      {booking.status === "assigned" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "confirmed")}>{busyId === booking.id ? "…" : "Conferma"}</button>}
+                      {booking.status === "confirmed" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "in_progress")}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
+                      {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "refunded" && <Link className="button" href={`/officina/checklist?booking=${booking.id}`}>Checklist</Link>}
+                      {booking.status === "completed" && <Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Rivedi</Link>}
+                      <span style={{ fontWeight: 700 }}>{payout}</span>
+                    </div>
                   </div>;
                 })}
               </div>
