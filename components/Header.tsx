@@ -27,9 +27,7 @@ export function Header() {
         </button>
 
         <Link href="/" className="brand-lockup" aria-label="VeriDrive home" onClick={() => setOpen(false)}>
-          <span className="brand-approved-frame" aria-hidden="true">
-            <Image src="/veridrive-official.png" alt="" width={58} height={58} priority className="brand-approved-symbol" />
-          </span>
+          <Image src="/veridrive-approved.svg" alt="" width={58} height={58} priority className="brand-approved-symbol" />
           <span className="brand-wordmark"><span>Veri</span><b>Drive</b></span>
         </Link>
 
