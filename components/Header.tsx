@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
@@ -27,7 +26,8 @@ export function Header() {
         </button>
 
         <Link href="/" className="brand-lockup" aria-label="VeriDrive home" onClick={() => setOpen(false)}>
-          <Image src="/veridrive-official.svg" alt="VeriDrive" width={258} height={108} priority className="brand-official-logo" />
+          <img src="/veridrive-approved.svg" alt="VeriDrive" className="brand-approved-logo" />
+          <span className="brand-wordmark"><span>Veri</span><b>Drive</b></span>
         </Link>
 
         <nav aria-label="Navigazione principale">
