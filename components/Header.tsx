@@ -21,36 +21,21 @@ export function Header() {
   return (
     <header>
       <div className="shell nav">
-        <button
-          type="button"
-          className="mobile-menu-button"
-          aria-label={open ? "Chiudi menu" : "Apri menu"}
-          aria-expanded={open}
-          aria-controls="mobile-navigation"
-          onClick={() => setOpen((value) => !value)}
-        >
+        <button type="button" className="mobile-menu-button" aria-label={open ? "Chiudi menu" : "Apri menu"} aria-expanded={open} aria-controls="mobile-navigation" onClick={() => setOpen((value) => !value)}>
           {open ? <X size={22} /> : <Menu size={22} />}
           <span className="sr-only">{open ? "Chiudi menu" : "Apri menu"}</span>
         </button>
 
         <Link href="/" className="brand-lockup" aria-label="VeriDrive home" onClick={() => setOpen(false)}>
-          <Image
-            src="/veridrive-logo.svg"
-            alt="VeriDrive"
-            width={188}
-            height={64}
-            priority
-            className="brand-logo-image"
-          />
+          <Image src="/veridrive-logo.svg" alt="Simbolo VeriDrive" width={58} height={58} priority className="brand-symbol" />
+          <span className="brand-wordmark"><span>Veri</span><b>Drive</b></span>
         </Link>
 
         <nav aria-label="Navigazione principale">
           {links.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
         </nav>
 
-        <Link className="button nav-cta" href="/prenota" onClick={() => setOpen(false)}>
-          Prenota
-        </Link>
+        <Link className="button nav-cta" href="/prenota" onClick={() => setOpen(false)}>Prenota</Link>
       </div>
 
       {open && (
