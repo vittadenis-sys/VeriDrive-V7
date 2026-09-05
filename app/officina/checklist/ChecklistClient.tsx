@@ -1,27 +1,49 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { checklist } from "@/lib/checklist";
 import { calculateVeriscore, scoreLabel } from "@/lib/veriscore";
 import { VeriScore } from "@/components/VeriScore";
 
-const PHOTO_POLICY = "Per la Verifica Plus, carica foto solo dei difetti riscontrati.";
-
 type Result = "ok" | "issue" | "critical" | undefined;
-
 type Props = { bookingId: string };
+
+type InspectionResponse = {
+  inspection?: { checklist?: Array<{ id: number; result: Result | null }>; notes?: string | null };
+};
 
 export default function ChecklistClient({ bookingId }: Props) {
   const [values, setValues] = useState<Record<number, Result>>({});
   const [notes, setNotes] = useState("");
-  const [photoCount, setPhotoCount] = useState(0);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const score = useMemo(() => calculateVeriscore(checklist.map((item) => values[item.id] === "ok")), [values]);
   const completed = Object.values(values).filter(Boolean).length;
   const canClose = completed === checklist.length;
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const response = await fetch(`/api/workshop/inspection?bookingId=${encodeURIComponent(bookingId)}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json() as InspectionResponse;
+        const saved = data.inspection?.checklist ?? [];
+        if (!active) return;
+        const next: Record<number, Result> = {};
+        for (const item of saved) if (item.result) next[item.id] = item.result;
+        setValues(next);
+        setNotes(data.inspection?.notes ?? "");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void load();
+    return () => { active = false; };
+  }, [bookingId]);
 
   function setResult(id: number, result: Exclude<Result, undefined>) {
     setValues((current) => ({ ...current, [id]: current[id] === result ? undefined : result }));
@@ -29,25 +51,32 @@ export default function ChecklistClient({ bookingId }: Props) {
   }
 
   async function saveInspection(close = false) {
+    if (close && !canClose) return;
     setBusy(true); setMessage("");
     try {
       const checklistResults = checklist.map((item) => ({ id: item.id, area: item.area, label: item.label, result: values[item.id] ?? null }));
       const response = await fetch("/api/workshop/inspection", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, checklist: checklistResults, passedChecks: values ? checklistResults.filter((item) => item.result === "ok").length : 0, notes, close }),
+        body: JSON.stringify({ bookingId, checklist: checklistResults, notes, close }),
       });
-      const data = await response.json();
+      const data = await response.json() as { error?: string; veriscore?: number };
       if (!response.ok) throw new Error(data.error ?? "Salvataggio non riuscito.");
       if (close) {
-        const statusResponse = await fetch("/api/workshop/status", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId, toStatus: "completed" }) });
-        const statusData = await statusResponse.json();
+        const statusResponse = await fetch("/api/workshop/status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookingId, toStatus: "completed" }),
+        });
+        const statusData = await statusResponse.json() as { error?: string };
         if (!statusResponse.ok) throw new Error(statusData.error ?? "Impossibile chiudere la verifica.");
       }
-      setMessage(close ? "Verifica chiusa correttamente." : "Ispezione salvata.");
+      setMessage(close ? "Verifica chiusa correttamente." : `Ispezione salvata. VeriScore ${data.veriscore ?? score}/100.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Operazione non riuscita.");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -66,6 +95,8 @@ export default function ChecklistClient({ bookingId }: Props) {
           </div>
         </div>
 
+        {loading && <p className="notice" style={{ marginTop: 18 }}>Caricamento della pratica…</p>}
+
         <div className="checklist" style={{ marginTop: 24 }}>
           {checklist.map((item) => (
             <div className="check" key={item.id} style={{ display: "block" }}>
@@ -82,20 +113,13 @@ export default function ChecklistClient({ bookingId }: Props) {
         </div>
 
         <section className="panel" style={{ marginTop: 24 }}>
-          <h3>Foto dei difetti</h3>
-          <p>{PHOTO_POLICY}</p>
-          <input type="file" accept="image/*" multiple onChange={(event) => setPhotoCount(event.target.files?.length ?? 0)} />
-          <p style={{ marginTop: 8, marginBottom: 0 }}>{photoCount ? `${photoCount} foto selezionate.` : "Nessuna foto selezionata."}</p>
-        </section>
-
-        <section className="panel" style={{ marginTop: 24 }}>
           <h3>Note finali</h3>
           <textarea value={notes} onChange={(event) => { setNotes(event.target.value); setMessage(""); }} placeholder="Annotazioni del tecnico..." rows={5} style={{ width: "100%" }} />
         </section>
 
         <div className="actions" style={{ marginTop: 24 }}>
-          <button type="button" className="button" onClick={() => void saveInspection(false)} disabled={busy || !completed}>Salva ispezione</button>
-          {canClose && <button type="button" className="button" onClick={() => void saveInspection(true)} disabled={busy}>Chiudi verifica</button>}
+          <button type="button" className="button" onClick={() => void saveInspection(false)} disabled={busy || loading || !completed}>Salva ispezione</button>
+          {canClose && <button type="button" className="button" onClick={() => void saveInspection(true)} disabled={busy || loading}>Chiudi verifica</button>}
         </div>
 
         {message && <p className="notice" style={{ marginTop: 16 }}>{message}</p>}
