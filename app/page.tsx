@@ -44,6 +44,39 @@ export default function Home() {
         </div></section>
 
         <section className="panel-section veriscore-section"><div className="shell veriscore-showcase"><div><div className="eyebrow">VERISCORE®</div><h2>Un numero per capire subito il risultato.</h2><p className="lead">Il VeriScore sintetizza l'esito della verifica in un formato chiaro e leggibile.</p></div><div className="veriscore-demo card"><VeriScore score={92} size={176}/><div><strong>92/100</strong><span>Anteprima grafica</span><small>Il punteggio reale viene generato dalla checklist della verifica.</small></div></div></div></section>
+
+        <section className="panel-section certificate-preview-section">
+          <div className="shell">
+            <div className="eyebrow">VERIDRIVE CHECK · ANTEPRIMA</div>
+            <div className="certificate-preview card">
+              <div className="certificate-preview-main">
+                <div className="certificate-preview-top">
+                  <span>VERIDRIVE</span>
+                  <span>PROTOCOLLO V1.0</span>
+                </div>
+                <div className="certificate-score-row">
+                  <div>
+                    <div className="eyebrow">VERISCORE</div>
+                    <div className="certificate-score-number">92<span>/100</span></div>
+                    <strong>Ottimo</strong>
+                  </div>
+                  <div className="certificate-qr" aria-label="Anteprima QR certificato"><QrCode size={92} strokeWidth={1.5} /></div>
+                </div>
+                <div className="certificate-preview-meta">
+                  <div><span>Controlli</span><strong>50</strong></div>
+                  <div><span>Certificato</span><strong>Verificabile online</strong></div>
+                  <div><span>Data</span><strong>Al momento del controllo</strong></div>
+                </div>
+              </div>
+              <div className="certificate-preview-copy">
+                <h3>Un certificato che puoi verificare.</h3>
+                <p>Ogni VeriScore genera un certificato digitale con codice univoco e QR per verificarne l'autenticità online.</p>
+                <Link className="button secondary" href="/verifica">Verifica un certificato <ArrowRight size={18} /></Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="panel"><div className="shell cta-panel"><div><div className="eyebrow">PRONTO?</div><h2>Conosci prima. Decidi meglio.</h2><p>Seleziona il servizio più adatto alla tua situazione.</p></div><Link className="button" href="/prenota">Prenota <ArrowRight size={18}/></Link></div></section>
       </main><Footer/>
     </>
