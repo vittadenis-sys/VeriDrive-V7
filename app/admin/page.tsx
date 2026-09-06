@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, FileText, ReceiptText, Users, Wrench } from "lucide-react";
+import { ArrowRight, Building2, FileText, ReceiptText, Users, Wrench, LogIn } from "lucide-react";
 import { Header } from "@/components/Header";
 
 const adminSections = [
@@ -20,7 +20,10 @@ export default function Admin() {
             <h1>Controllo operativo</h1>
             <p className="lead">Ordini, officine, commercianti e liquidazioni in un solo pannello.</p>
           </div>
-          <Link className="button" href="/officina"><Wrench size={18} /> La mia officina</Link>
+          <div className="actions">
+            <Link className="button secondary" href="/admin/login"><LogIn size={18} /> Accesso Admin</Link>
+            <Link className="button" href="/officina"><Wrench size={18} /> La mia officina</Link>
+          </div>
         </div>
 
         <section style={{ padding: "28px 0 12px" }}>
