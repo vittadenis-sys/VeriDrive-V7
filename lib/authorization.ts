@@ -3,17 +3,25 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 export async function requireAdmin() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) throw new Error("Unauthorized");
 
   const db = createServiceClient();
-  const { data: admin, error } = await db
+  const { data: admin, error: adminError } = await db
     .from("admins")
-    .select("id, role")
+    .select("auth_id, role")
     .eq("auth_id", user.id)
     .maybeSingle();
 
-  if (error || !admin || !["admin", "super_admin"].includes(admin.role)) {
+  if (adminError) {
+    throw new Error(`Admin lookup failed: ${adminError.message}`);
+  }
+
+  if (!admin || !["admin", "super_admin"].includes(admin.role)) {
     throw new Error("Unauthorized");
   }
 
