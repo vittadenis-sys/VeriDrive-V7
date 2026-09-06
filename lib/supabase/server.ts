@@ -1,27 +1,16 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { cloudflareEnv } from "cloudflare:workers";
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const env = cloudflareEnv as {
-    NEXT_PUBLIC_SUPABASE_URL?: string;
-    NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
-    NEXT_PUBLIC_SUPABASE_PROJECT_URL?: string;
-  };
 
-  const url =
-    env.NEXT_PUBLIC_SUPABASE_URL ??
-    env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ??
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!url || !key) {
-    throw new Error("Supabase non configurato nel runtime Cloudflare.");
+    throw new Error("Supabase non configurato.");
   }
 
   return createServerClient(url, key, {
@@ -41,5 +30,5 @@ export async function createClient() {
         }
       },
     },
-  );
+  });
 }
