@@ -1,15 +1,26 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
+import { cloudflareEnv } from "cloudflare:workers";
 
 export async function GET() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const env = cloudflareEnv as {
+    NEXT_PUBLIC_SUPABASE_URL?: string;
+    NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
+    NEXT_PUBLIC_SUPABASE_PROJECT_URL?: string;
+  };
 
-  if (!url) return NextResponse.json({ configured: false }, { status: 503 });
+  const url =
+    env.NEXT_PUBLIC_SUPABASE_URL ??
+    env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ??
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (key) {
-    return NextResponse.json({ configured: true, url, key });
-  }
-
-  return NextResponse.json({ configured: false, serverConfigured: true }, { status: 503 });
+  return NextResponse.json({
+    configured: Boolean(url && key),
+    url: Boolean(url),
+    key: Boolean(key),
+  });
 }
