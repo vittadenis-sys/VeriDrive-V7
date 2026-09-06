@@ -12,14 +12,14 @@ export async function POST(request: Request) {
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("id,demo_access")
+    .select("id,demo_access,autogerma_free_booking_bonus")
     .eq("auth_id", user.id)
     .single();
   if (!customer) return NextResponse.json({ error: "Profilo cliente non disponibile." }, { status: 400 });
 
   const { data: booking, error: bookingError } = await supabase
     .from("bookings")
-    .select("id,customer_id,customer_price_cents,service_key")
+    .select("id,customer_id,customer_price_cents,service_key,workshop_id,paid_with_autogerma_bonus")
     .eq("id", bookingId)
     .eq("customer_id", customer.id)
     .single();
