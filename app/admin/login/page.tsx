@@ -8,8 +8,11 @@ export default function AdminLogin() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function login(form: FormData) {
+  async function login(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
     setBusy(true); setMessage("");
+    const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     try {
@@ -24,12 +27,17 @@ export default function AdminLogin() {
     }
   }
 
-  async function reset(form: FormData) {
+  async function reset(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
     setBusy(true); setMessage("");
+    const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     try {
       const client = createClient();
-      const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/admin/reset-password` });
+      const { error } = await client.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/admin/reset-password`,
+      });
       setMessage(error ? error.message : "Controlla la tua email per il link di recupero.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Errore durante il recupero password.");
@@ -42,12 +50,12 @@ export default function AdminLogin() {
     <div className="eyebrow">AMMINISTRAZIONE</div>
     <h1 style={{fontSize:"clamp(40px,6vw,54px)"}}>Accesso Admin</h1>
     <p className="lead">Accedi con email e password. Il recupero password usa un Magic Link inviato all'indirizzo admin.</p>
-    <form action={login} className="panel form">
+    <form onSubmit={login} className="panel form">
       <label className="full">Email<input name="email" type="email" value="admin@veridrive.it" readOnly required /></label>
       <label className="full">Password<input name="password" type="password" minLength={8} required /></label>
       <button className="button full" disabled={busy}>{busy ? "Attendi…" : "Accedi"}</button>
     </form>
-    <form action={reset} className="panel form" style={{marginTop:18}}>
+    <form onSubmit={reset} className="panel form" style={{marginTop:18}}>
       <div className="full"><h3>Password dimenticata?</h3><p>Invia un Magic Link a <b>admin@veridrive.it</b> per impostarne una nuova.</p></div>
       <input type="hidden" name="email" value="admin@veridrive.it" />
       <button className="button secondary full" disabled={busy}>Invia Magic Link</button>
