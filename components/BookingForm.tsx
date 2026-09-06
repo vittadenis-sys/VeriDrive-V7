@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { VERIDRIVE_SERVICES, CUSTOMER_SERVICE_GROUPS } from "@/lib/services";
 
 type ServiceKey = keyof typeof VERIDRIVE_SERVICES;
@@ -22,10 +22,17 @@ export function BookingForm(){
   const [date,setDate]=useState(""); const [slot,setSlot]=useState(""); const [location,setLocation]=useState("");
   const [workshops,setWorkshops]=useState<(Workshop&{distanceKm?:number})[]>([]); const [selectedWorkshop,setSelectedWorkshop]=useState("");
   const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false); const [loadingSlots,setLoadingSlots]=useState(false);
+  const [demoAccess,setDemoAccess]=useState(false); const [demoLoaded,setDemoLoaded]=useState(false);
   const selected=VERIDRIVE_SERVICES[service];
   const price=useMemo(()=>(selected.priceCents+(urgency?2500:0))/100,[selected.priceCents,urgency]);
   const isOnline=service==="check_online";
   const customerServices=[...new Set([...CUSTOMER_SERVICE_GROUPS.own_car,...CUSTOMER_SERVICE_GROUPS.buying_used])] as ServiceKey[];
+
+  useEffect(()=>{
+    void fetch("/api/customer/bookings",{cache:"no-store"})
+      .then(async response=>{ if(!response.ok){setDemoLoaded(true);return;} const data=await response.json(); setDemoAccess(Boolean(data.customer?.demo_access)); setDemoLoaded(true); })
+      .catch(()=>setDemoLoaded(true));
+  },[]);
 
   async function refreshAvailability(nextService=service,nextDate=date,nextUrgency=urgency){
     if(!nextDate||VERIDRIVE_SERVICES[nextService].workshop===false){setWorkshops([]);setSelectedWorkshop("");return;}
@@ -57,7 +64,9 @@ export function BookingForm(){
       const response=await fetch("/api/bookings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({service,referenceType,plate:referenceType==="plate"?reference:null,listingUrl:referenceType==="listing"?reference:null,make:form.get("make"),model:form.get("model"),date:isOnline?null:date,slot:isOnline?null:slot,location:isOnline?null:location,urgency:isOnline?false:urgency,workshopId:isOnline?null:selectedWorkshop})});
       const data=await response.json(); if(!response.ok){setMessage(data.error||"Impossibile creare la prenotazione.");return;}
       const checkoutResponse=await fetch("/api/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bookingId:data.bookingId})});
-      const checkout=await checkoutResponse.json(); if(!checkoutResponse.ok||!checkout.url){setMessage(checkout.error||"Prenotazione creata, ma impossibile aprire il pagamento.");return;}
+      const checkout=await checkoutResponse.json(); if(!checkoutResponse.ok){setMessage(checkout.error||"Impossibile completare la prenotazione.");return;}
+      if(checkout.demo){window.location.href=`/dashboard?booked=${data.bookingId}`;return;}
+      if(!checkout.url){setMessage("Prenotazione creata, ma impossibile aprire il pagamento.");return;}
       window.location.href=checkout.url;
     }catch{setMessage("Si è verificato un errore. Riprova tra poco.");}finally{setBusy(false);}
   }
@@ -79,7 +88,7 @@ export function BookingForm(){
     {selected.certificate&&<div className="full panel" style={{marginTop:0}}><p style={{marginBottom:4}}><b>Certificato VeriDrive incluso</b></p><p style={{marginBottom:0}}>VeriScore, risultato della verifica, certificato digitale e QR pubblico di verifica.</p></div>}
     {selected.photos&&<div className="full panel" style={{marginTop:0}}><p style={{marginBottom:4}}><b>VeriScorePlus</b></p><p style={{marginBottom:0}}>Foto solamente dei difetti riscontrati e stima indicativa dei costi di riparazione.</p></div>}
     {isOnline&&<div className="full notice" style={{marginTop:0}}>Risposta entro 24 ore.</div>}
-    <button className="button full" disabled={busy} type="submit">{busy?"Apertura pagamento…":`Paga €${price.toFixed(2).replace('.',',')} e continua`}</button>
+    <button className="button full" disabled={busy} type="submit">{busy?"Attendi…":demoLoaded&&demoAccess?"Prenota gratuitamente":`Paga €${price.toFixed(2).replace('.',',')} e continua`}</button>
     {message&&<p className="notice full">{message}</p>}
   </form>;
 }
