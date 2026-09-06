@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, Building2, FileText, ReceiptText, Users, Wrench, LogIn } from "lucide-react";
+import { redirect } from "next/navigation";
+import { ArrowRight, Building2, FileText, ReceiptText, Users, Wrench, LogOut } from "lucide-react";
 import { Header } from "@/components/Header";
+import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/authorization";
 
 const adminSections = [
   { href: "/admin/bookings", title: "Prenotazioni", text: "Controlla pratiche, assegnazioni e stati.", icon: FileText },
@@ -9,7 +12,20 @@ const adminSections = [
   { href: "/admin/commercianti", title: "Commercianti", text: "Gestisci aziende e crediti per Check-up + VeriScore.", icon: Users },
 ];
 
-export default function Admin() {
+export default async function Admin() {
+  try {
+    await requireAdmin();
+  } catch {
+    redirect("/admin/login");
+  }
+
+  async function logout() {
+    "use server";
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+    redirect("/admin/login");
+  }
+
   return <>
     <Header />
     <main className="page">
@@ -21,7 +37,9 @@ export default function Admin() {
             <p className="lead">Ordini, officine, commercianti e liquidazioni in un solo pannello.</p>
           </div>
           <div className="actions">
-            <Link className="button secondary" href="/admin/login"><LogIn size={18} /> Accesso Admin</Link>
+            <form action={logout}>
+              <button className="button secondary" type="submit"><LogOut size={18} /> Esci</button>
+            </form>
             <Link className="button" href="/officina"><Wrench size={18} /> La mia officina</Link>
           </div>
         </div>
