@@ -1,5 +1,8 @@
-import { createServerClient, type CookieMethodsServer } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import type { CookieOptions } from "@supabase/ssr";
+
+type SupabaseCookie = { name: string; value: string; options?: CookieOptions };
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -8,21 +11,26 @@ export async function updateSession(request: NextRequest) {
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return response;
 
-  const cookies: CookieMethodsServer = {
+  const cookies = {
     getAll() {
       return request.cookies.getAll();
     },
-    setAll(cookiesToSet) {
-      cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+    setAll(cookiesToSet: SupabaseCookie[]) {
+      for (const { name, value } of cookiesToSet) {
+        request.cookies.set(name, value);
+      }
       response = NextResponse.next({ request });
-      cookiesToSet.forEach(({ name, value, options }) => {
+      for (const { name, value, options } of cookiesToSet) {
         response.cookies.set(name, value, options);
-      });
+      }
     },
   };
 
   const supabase = createServerClient(url, key, { cookies });
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const path = request.nextUrl.pathname;
   const protectedArea =
     path.startsWith("/dashboard") ||
