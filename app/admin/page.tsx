@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 
 const adminSections = [
   { href: "/admin/bookings", title: "Prenotazioni", text: "Controlla pratiche, assegnazioni e stati.", icon: FileText },
+  { href: "/admin/clienti", title: "Clienti B2C", text: "Gestisci clienti e Accesso Demo individuale.", icon: Users },
   { href: "/admin/workshops", title: "Officine", text: "Gestisci rete, disponibilità e riepiloghi mensili.", icon: Building2 },
   { href: "/admin/payouts", title: "Liquidazioni", text: "Controlla quanto è maturato e cosa è già stato pagato.", icon: ReceiptText },
   { href: "/admin/commercianti", title: "Commercianti", text: "Gestisci aziende e crediti per Check-up + VeriScore.", icon: Users },
@@ -18,7 +19,7 @@ export default function Admin() {
         <div className="dashboard-hero">
           <div>
             <h1>Controllo operativo</h1>
-            <p className="lead">Ordini, officine, commercianti e liquidazioni in un solo pannello.</p>
+            <p className="lead">Ordini, clienti, officine, commercianti e liquidazioni in un solo pannello.</p>
           </div>
           <Link className="button" href="/officina"><Wrench size={18} /> La mia officina</Link>
         </div>
