@@ -2,30 +2,28 @@
 
 import { useState } from "react";
 import { Header } from "@/components/Header";
-import { getSupabaseClientAsync } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminLogin() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function login(form: FormData) {
-    const client = await getSupabaseClientAsync();
-    if (!client) { setMessage("Servizio di accesso non configurato."); return; }
+    if (!supabase) { setMessage("Servizio di accesso non configurato."); return; }
     setBusy(true); setMessage("");
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
-    const { error } = await client.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) { setMessage(error.message); return; }
     window.location.assign("/admin");
   }
 
   async function reset(form: FormData) {
-    const client = await getSupabaseClientAsync();
-    if (!client) { setMessage("Servizio di accesso non configurato."); return; }
+    if (!supabase) { setMessage("Servizio di accesso non configurato."); return; }
     setBusy(true); setMessage("");
     const email = String(form.get("email") ?? "").trim();
-    const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/admin/reset-password` });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/admin/reset-password` });
     setBusy(false);
     setMessage(error ? error.message : "Controlla la tua email per il link di recupero.");
   }
