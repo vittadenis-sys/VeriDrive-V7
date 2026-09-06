@@ -49,7 +49,7 @@ export function calculateWeightedVeriscore(results: Record<number, CheckResult>)
 export function calculateVeriscore(values: CheckResult[] | boolean[]) {
   const results: Record<number, CheckResult> = {};
   values.forEach((value, index) => {
-    results[index + 1] = value === true ? "ok" : value;
+    results[index + 1] = value === true ? "ok" : value === false ? "critical" : value;
   });
   return calculateWeightedVeriscore(results);
 }
