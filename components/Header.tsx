@@ -6,10 +6,9 @@ import { Menu, X, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 const links = [
-  ["/officina", "Officine"],
-  ["/commercianti", "Commercianti"],
   ["/dashboard", "Area Cliente"],
-  ["/admin", "Admin"],
+  ["/commercianti", "Commercianti"],
+  ["/officina", "Officine"],
 ] as const;
 
 export function Header() {
