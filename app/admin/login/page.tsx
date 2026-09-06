@@ -11,15 +11,25 @@ export default function AdminLogin() {
   async function login(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
-    setBusy(true); setMessage("");
+    setBusy(true);
+    setMessage("");
+
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
+
     try {
       const client = createClient();
-      const { error } = await client.auth.signInWithPassword({ email, password });
-      if (error) setMessage(error.message);
-      else window.location.assign("/admin");
+      const { data, error } = await client.auth.signInWithPassword({ email, password });
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
+      if (!data.session) {
+        setMessage("Accesso non completato: nessuna sessione ricevuta.");
+        return;
+      }
+      window.location.assign("/admin");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Errore durante l'accesso.");
     } finally {
@@ -30,9 +40,11 @@ export default function AdminLogin() {
   async function reset(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
-    setBusy(true); setMessage("");
+    setBusy(true);
+    setMessage("");
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
+
     try {
       const client = createClient();
       const { error } = await client.auth.resetPasswordForEmail(email, {
@@ -53,12 +65,12 @@ export default function AdminLogin() {
     <form onSubmit={login} className="panel form">
       <label className="full">Email<input name="email" type="email" value="admin@veridrive.it" readOnly required /></label>
       <label className="full">Password<input name="password" type="password" minLength={8} required /></label>
-      <button className="button full" disabled={busy}>{busy ? "Attendi…" : "Accedi"}</button>
+      <button className="button full" type="submit" disabled={busy}>{busy ? "Attendi…" : "Accedi"}</button>
     </form>
     <form onSubmit={reset} className="panel form" style={{marginTop:18}}>
       <div className="full"><h3>Password dimenticata?</h3><p>Invia un Magic Link a <b>admin@veridrive.it</b> per impostarne una nuova.</p></div>
       <input type="hidden" name="email" value="admin@veridrive.it" />
-      <button className="button secondary full" disabled={busy}>Invia Magic Link</button>
+      <button className="button secondary full" type="submit" disabled={busy}>{busy ? "Attendi…" : "Invia Magic Link"}</button>
     </form>
     {message&&<p className="notice" style={{marginTop:16}}>{message}</p>}
   </div></main></>;
