@@ -1,20 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Header } from "@/components/Header";
 import { getSupabaseClientAsync } from "@/lib/supabase";
 
 export default function AdminLogin() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    void getSupabaseClientAsync().then((client) => {
-      setReady(Boolean(client));
-      if (!client) setMessage("Servizio di accesso non configurato.");
-    });
-  }, []);
 
   async function login(form: FormData) {
     const client = await getSupabaseClientAsync();
@@ -45,12 +37,12 @@ export default function AdminLogin() {
     <form action={login} className="panel form">
       <label className="full">Email<input name="email" type="email" value="admin@veridrive.it" readOnly required /></label>
       <label className="full">Password<input name="password" type="password" minLength={8} required /></label>
-      <button className="button full" disabled={busy || !ready}>{busy ? "Attendi…" : "Accedi"}</button>
+      <button className="button full" disabled={busy}>{busy ? "Attendi…" : "Accedi"}</button>
     </form>
     <form action={reset} className="panel form" style={{marginTop:18}}>
       <div className="full"><h3>Password dimenticata?</h3><p>Invia un Magic Link a <b>admin@veridrive.it</b> per impostarne una nuova.</p></div>
       <input type="hidden" name="email" value="admin@veridrive.it" />
-      <button className="button secondary full" disabled={busy || !ready}>Invia Magic Link</button>
+      <button className="button secondary full" disabled={busy}>Invia Magic Link</button>
     </form>
     {message&&<p className="notice" style={{marginTop:16}}>{message}</p>}
   </div></main></>;
