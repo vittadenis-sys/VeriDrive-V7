@@ -1,25 +1,41 @@
 import Link from "next/link";
 import { Header } from "@/components/Header";
+import { requireAdmin } from "@/lib/authorization";
+import { createClient } from "@/lib/supabase/server";
 
-export default function Workshops(){
+export default async function Workshops() {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data: workshops } = await supabase
+    .from("workshops")
+    .select("id,name,display_name,city,address,postal_code,is_active")
+    .order("display_name", { ascending: true });
+
+  const activeWorkshops = workshops ?? [];
+
   return <>
     <Header />
-    <main className="page">
-      <div className="shell">
-        <Link href="/admin">← Amministrazione</Link>
-        <div className="eyebrow" style={{marginTop:24}}>Rete partner</div>
-        <h1 style={{fontSize:"clamp(38px,6vw,54px)"}}>Gestione officine</h1>
-        <p className="lead">Le officine attive ricevono le pratiche. Da qui puoi controllare copertura e liquidazioni mensili.</p>
-        <div className="panel" style={{marginTop:24}}>
-          <h3>Officina principale</h3>
-          <p style={{marginBottom:6}}><b>VeriDrive Faloppio — Autogerma</b></p>
-          <p style={{margin:0,opacity:.75}}>La sede principale usa la stessa esperienza operativa delle officine partner.</p>
+    <main className="page"><div className="shell">
+      <Link href="/admin">← Amministrazione</Link>
+      <div className="eyebrow" style={{ marginTop: 24 }}>Rete partner</div>
+      <h1>Gestione officine</h1>
+      <p className="lead">Controlla officine attive, copertura, disponibilità e riepiloghi operativi.</p>
+
+      <section style={{ padding: "28px 0" }}>
+        <div className="cards">
+          {activeWorkshops.length === 0 ? <div className="panel"><p style={{ marginBottom: 0 }}>Nessuna officina presente.</p></div> : activeWorkshops.map((workshop) => <article className="card" key={workshop.id}>
+            <div className="eyebrow">{workshop.is_active === false ? "INATTIVA" : "ATTIVA"}</div>
+            <h3>{workshop.display_name || workshop.name || "Officina"}</h3>
+            <p>{[workshop.address, workshop.postal_code, workshop.city].filter(Boolean).join(" · ") || "Indirizzo non disponibile"}</p>
+            <Link className="button secondary" href="/officina">Apri area officina</Link>
+          </article>)}
         </div>
-        <div className="panel" style={{marginTop:18}}>
-          <h3>Riepilogo operativo</h3>
-          <p style={{marginBottom:0}}>In questa area verranno mostrati officine attive, verifiche concluse del mese, importi maturati e fatture ricevute.</p>
-        </div>
-      </div>
-    </main>
+      </section>
+
+      <section className="panel" style={{ marginTop: 8 }}>
+        <h3>Operatività</h3>
+        <p style={{ marginBottom: 0 }}>Le assegnazioni vengono gestite sulle pratiche con gli slot realmente disponibili nel calendario officina.</p>
+      </section>
+    </div></main>
   </>;
 }
