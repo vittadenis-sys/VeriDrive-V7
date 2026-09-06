@@ -5,7 +5,7 @@ export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Accesso richiesto." }, { status: 401 });
-  const { data: customer } = await supabase.from("customers").select("id,full_name,phone,demo_access").eq("auth_id", user.id).maybeSingle();
+  const { data: customer } = await supabase.from("customers").select("id,full_name,phone,demo_access,autogerma_free_booking_bonus").eq("auth_id", user.id).maybeSingle();
   if (!customer) return NextResponse.json({ error: "Profilo cliente non disponibile." }, { status: 403 });
 
   const { data: bookings, error } = await supabase
