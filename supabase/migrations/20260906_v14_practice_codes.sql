@@ -1,5 +1,6 @@
 -- VeriDrive V14: short human-friendly practice codes.
--- Keeps UUIDs internal while exposing VD-00001 ... VD-99999 to users.
+-- UUIDs remain internal; user-facing codes are VD-00001, VD-00002, ...
+-- After 99999 the format naturally continues as VD-100000, etc.
 
 alter table public.bookings
   add column if not exists practice_code text;
@@ -10,7 +11,6 @@ create unique index if not exists bookings_practice_code_uidx
 
 create sequence if not exists public.veridrive_practice_code_seq
   minvalue 1
-  maxvalue 99999
   start 1
   increment 1
   cache 1;
@@ -22,18 +22,8 @@ as $$
 declare
   next_number bigint;
 begin
-  loop
-    next_number := nextval('public.veridrive_practice_code_seq');
-    if next_number > 99999 then
-      raise exception 'Codici pratica VD esauriti';
-    end if;
-
-    begin
-      return 'VD-' || lpad(next_number::text, 5, '0');
-    exception when unique_violation then
-      continue;
-    end;
-  end loop;
+  next_number := nextval('public.veridrive_practice_code_seq');
+  return 'VD-' || lpad(next_number::text, 5, '0');
 end;
 $$;
 
@@ -54,6 +44,22 @@ create trigger bookings_practice_code_trigger
 before insert on public.bookings
 for each row execute function public.set_booking_practice_code();
 
-update public.bookings
+with missing as (
+  select id
+  from public.bookings
+  where practice_code is null
+  order by created_at asc, id asc
+)
+update public.bookings b
 set practice_code = public.next_veridrive_practice_code()
-where practice_code is null;
+from missing m
+where b.id = m.id;
+
+select setval(
+  'public.veridrive_practice_code_seq',
+  greatest(
+    coalesce((select max(nullif(regexp_replace(practice_code, '^VD-', ''), '')::bigint) from public.bookings where practice_code ~ '^VD-[0-9]+$'), 0),
+    (select last_value from public.veridrive_practice_code_seq)
+  ),
+  true
+);
