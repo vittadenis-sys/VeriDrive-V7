@@ -6,9 +6,6 @@ import { Menu, X } from "lucide-react";
 import { useState } from "react";
 
 const links = [
-  ["/#percorsi", "Servizi"],
-  ["/auto", "La tua auto"],
-  ["/acquisto-auto-usata", "Stai acquistando un'auto"],
   ["/officina", "Officine"],
   ["/commercianti", "Commercianti"],
   ["/dashboard", "Area Cliente"],
@@ -17,6 +14,12 @@ const links = [
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const [servicesOpen, setServicesOpen] = useState(false);
+
+  const closeMenu = () => {
+    setOpen(false);
+    setServicesOpen(false);
+  };
 
   return (
     <header>
@@ -26,22 +29,42 @@ export function Header() {
           <span className="sr-only">{open ? "Chiudi menu" : "Apri menu"}</span>
         </button>
 
-        <Link href="/" className="brand-lockup" aria-label="VeriDrive home" onClick={() => setOpen(false)}>
+        <Link href="/" className="brand-lockup" aria-label="VeriDrive home" onClick={closeMenu}>
           <Image src="/veridrive-logo.png" alt="" width={38} height={38} priority className="brand-approved-symbol" />
           <span className="brand-wordmark"><span>Veri</span><b>Drive</b></span>
         </Link>
 
         <nav aria-label="Navigazione principale">
+          <div className="desktop-services">
+            <Link href="/#percorsi">Servizi</Link>
+          </div>
           {links.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
         </nav>
 
-        <Link className="button nav-cta" href="/prenota" onClick={() => setOpen(false)}>Prenota</Link>
+        <Link className="button nav-cta" href="/prenota" onClick={closeMenu}>Prenota</Link>
       </div>
 
       {open && (
         <div id="mobile-navigation" className="mobile-nav-panel" aria-label="Menu mobile">
-          {links.map(([href, label]) => <Link key={href} href={href} onClick={() => setOpen(false)}>{label}</Link>)}
-          <Link className="button" href="/prenota" onClick={() => setOpen(false)}>Prenota</Link>
+          <button
+            type="button"
+            className="mobile-submenu"
+            aria-expanded={servicesOpen}
+            onClick={() => setServicesOpen((value) => !value)}
+          >
+            <span>Servizi</span>
+            <span aria-hidden="true">{servicesOpen ? "−" : "+"}</span>
+          </button>
+
+          {servicesOpen && (
+            <div className="mobile-submenu-items">
+              <Link href="/auto" onClick={closeMenu}>La tua auto</Link>
+              <Link href="/acquisto-auto-usata" onClick={closeMenu}>Stai acquistando un'auto</Link>
+            </div>
+          )}
+
+          {links.map(([href, label]) => <Link key={href} href={href} onClick={closeMenu}>{label}</Link>)}
+          <Link className="button" href="/prenota" onClick={closeMenu}>Prenota</Link>
         </div>
       )}
     </header>
