@@ -7,10 +7,10 @@ import { requireAdmin } from "@/lib/authorization";
 
 const adminSections = [
   { href: "/admin/bookings", title: "Prenotazioni", text: "Controlla pratiche, assegnazioni e stati.", icon: FileText },
+  { href: "/admin/clienti", title: "Clienti", text: "Ricerca e gestione separata dei clienti B2C.", icon: UserRoundCheck },
+  { href: "/admin/commercianti", title: "Commercianti", text: "Ricerca e gestione separata delle aziende e dei crediti.", icon: Users },
   { href: "/admin/workshops", title: "Officine", text: "Gestisci rete, disponibilità e riepiloghi mensili.", icon: Building2 },
-  { href: "/admin/clienti", title: "Clienti", text: "Gestisci clienti e Accesso Demo B2C.", icon: UserRoundCheck },
   { href: "/admin/payouts", title: "Liquidazioni", text: "Controlla quanto è maturato e cosa è già stato pagato.", icon: ReceiptText },
-  { href: "/admin/commercianti", title: "Commercianti", text: "Gestisci aziende e crediti per Check-up + VeriScore.", icon: Users },
 ];
 
 export default async function Admin() {
@@ -35,7 +35,7 @@ export default async function Admin() {
         <div className="dashboard-hero">
           <div>
             <h1>Controllo operativo</h1>
-            <p className="lead">Ordini, officine, clienti, commercianti e liquidazioni in un solo pannello.</p>
+            <p className="lead">Ordini, clienti, commercianti, officine e liquidazioni in un solo pannello.</p>
           </div>
           <div className="actions">
             <form action={logout}>
