@@ -30,7 +30,6 @@ export async function POST(request: Request) {
   const isOnline = serviceKey === "check_online";
   const urgency = !isOnline && body.urgency === true;
   const requestedFreeBooking = body.useFreeBooking === true;
-  const requestedFreeBookingAllowedOnlyAtAutogerma = requestedFreeBooking && !isOnline;
   const customerPriceCents = getCustomerPriceCents(serviceKey, urgency);
   if (customerPriceCents == null) return NextResponse.json({ error: "Impossibile calcolare il prezzo." }, { status: 400 });
 
@@ -53,7 +52,7 @@ export async function POST(request: Request) {
     if (error || !data) return NextResponse.json({ error: "Officina non disponibile." }, { status: 400 });
     workshop = data;
 
-    if (requestedFreeBookingAllowedOnlyAtAutogermaAllowed(workshop.name, requestedFreeBookingAllowedOnlyAtAutogerma)) {
+    if (requestedFreeBooking && !workshop.name.toLowerCase().includes("autogerma")) {
       return NextResponse.json({ error: "La prenotazione gratuita è disponibile solo presso Autogerma." }, { status: 400 });
     }
 
@@ -67,8 +66,14 @@ export async function POST(request: Request) {
     if ((booked ?? []).length) return NextResponse.json({ error: "Lo slot selezionato non è più disponibile. Aggiorna gli orari e riprova." }, { status: 409 });
   }
 
-  const wantsFreeBooking = requestedFreeBooking && Boolean(workshop) && workshop?.name.toLowerCase().includes("autogerma");
-  const storedPrice = wantsFreeBooking ? 0 : customerPriceCents;
+  const wantsFreeBooking = requestedFreeBooking && Boolean(workshop) && workshop!.name.toLowerCase().includes("autogerma");
+
+  if (wantsFreeBooking) {
+    const db = createServiceClient();
+    const { data: claimed, error: claimError } = await db.rpc("claim_autogerma_free_booking", { customer_uuid: customer.id });
+    if (claimError) return NextResponse.json({ error: "Impossibile verificare il bonus gratuito." }, { status: 500 });
+    if (claimed !== true) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita non è più disponibile." }, { status: 409 });
+  }
 
   const insertPayload = {
     customer_id: customer.id,
@@ -81,27 +86,20 @@ export async function POST(request: Request) {
     location,
     listing_url: referenceType === "listing" ? reference : null,
     service_key: serviceKey,
-    customer_price_cents: storedPrice,
+    customer_price_cents: wantsFreeBooking ? 0 : customerPriceCents,
     urgency,
     urgency_price_cents: urgency ? 2500 : 0,
     paid_with_autogerma_bonus: wantsFreeBooking,
   };
 
-  if (wantsFreeBooking) {
-    const db = createServiceClient();
-    const { data: claimedCustomer, error: claimError } = await db
-      .from("customers")
-      .update({ autogerma_free_booking_bonus: customerFreeBonusDecrement() })
-      .eq("id", customer.id)
-      .gt("autogerma_free_booking_bonus", 0)
-      .select("id,autogerma_free_booking_bonus")
-      .maybeSingle();
-    if (claimError) return NextResponse.json({ error: "Impossibile verificare il bonus gratuito." }, { status: 500 });
-    if (!claimedCustomer) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita non è più disponibile." }, { status: 409 });
-  }
-
   const { data, error } = await supabase.from("bookings").insert(insertPayload).select("id,practice_code").single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    if (wantsFreeBooking) {
+      const db = createServiceClient();
+      await db.rpc("restore_autogerma_free_booking", { customer_uuid: customer.id });
+    }
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
 
   await sendBookingConfirmation(user.email ?? "", data.id);
   await sendBookingOperationalNotifications({
@@ -118,12 +116,4 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ bookingId: data.id, practiceNumber: data.practice_code, service: service.key, freeBooking: wantsFreeBooking });
-}
-
-function customerFreeBonusDecrement() {
-  return 0;
-}
-
-function requestedFreeBookingAllowedOnlyAtAutogermaAllowed(workshopName: string, requested: boolean) {
-  return requested && !workshopName.toLowerCase().includes("autogerma");
 }
