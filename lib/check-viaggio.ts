@@ -1,46 +1,26 @@
-export const CHECK_VIAGGIO_CHECKLIST = [
-  "Pneumatici e pressione",
-  "Freni e liquido freni",
-  "Batteria e avviamento",
-  "Livello e stato olio motore",
-  "Liquido refrigerante",
-  "Luci e segnalazioni",
-  "Tergicristalli e lavavetri",
-  "Perdite di liquidi",
-  "Sospensioni e sterzo",
-  "Cinture e dispositivi di sicurezza",
-  "Climatizzazione/disappannamento",
-  "Dotazioni di emergenza",
-] as const;
+export type TravelCheckItem = { id: number; area: string; label: string; weight: number };
 
-export type CheckViaggioResult =
-  | "recommended"
-  | "attention"
-  | "check_before_departure"
-  | "not_recommended";
+export const checkViaggioChecklist: TravelCheckItem[] = [
+  { id: 1, area: "Pneumatici", label: "Pneumatici: usura e pressione", weight: 1.5 },
+  { id: 2, area: "Freni", label: "Freni: controllo visivo e stato generale", weight: 1.5 },
+  { id: 3, area: "Batteria / avviamento", label: "Batteria e avviamento", weight: 1.0 },
+  { id: 4, area: "Sterzo / sospensioni", label: "Sterzo e sospensioni", weight: 1.0 },
+  { id: 5, area: "Olio motore", label: "Livello e condizioni olio motore", weight: 0.8 },
+  { id: 6, area: "Refrigerante", label: "Livello liquido refrigerante", weight: 0.7 },
+  { id: 7, area: "Luci / tergi / perdite", label: "Luci, tergicristalli e perdite evidenti", weight: 0.5 },
+  { id: 8, area: "Spie / Diagnosi", label: "Diagnosi OBD e spie: nessun errore attivo rilevante", weight: 2.0 },
+  { id: 9, area: "Altri problemi", label: "Altri problemi rilevati", weight: 1.0 },
+];
 
-export function getCheckViaggioResult(index: number): CheckViaggioResult {
-  if (index >= 9) return "recommended";
-  if (index >= 7) return "attention";
-  if (index >= 5) return "check_before_departure";
-  return "not_recommended";
+export type TravelCheckResult = "ok" | "issue" | "critical" | null;
+
+export function calculateTravelReliability(values: Record<number, TravelCheckResult>) {
+  return Number(checkViaggioChecklist.reduce((sum, item) => sum + (values[item.id] === "ok" ? item.weight : 0), 0).toFixed(1));
 }
 
-export function getCheckViaggioResultLabel(result: CheckViaggioResult) {
-  switch (result) {
-    case "recommended":
-      return "Viaggio consigliato";
-    case "attention":
-      return "Idonea con piccole attenzioni";
-    case "check_before_departure":
-      return "Da controllare prima di partire";
-    default:
-      return "Viaggio sconsigliato";
-  }
-}
-
-export function calculateCheckViaggioIndex(passed: number, total = CHECK_VIAGGIO_CHECKLIST.length) {
-  const safeTotal = Math.max(1, total);
-  const safePassed = Math.min(Math.max(0, passed), safeTotal);
-  return Number(((safePassed / safeTotal) * 10).toFixed(1));
+export function travelReliabilityLabel(score: number) {
+  if (score >= 9) return "Viaggio consigliato";
+  if (score >= 7) return "Idonea con piccole attenzioni";
+  if (score >= 5) return "Da controllare prima di partire";
+  return "Viaggio sconsigliato";
 }
