@@ -22,16 +22,19 @@ export function BookingForm(){
   const [date,setDate]=useState(""); const [slot,setSlot]=useState(""); const [location,setLocation]=useState("");
   const [workshops,setWorkshops]=useState<(Workshop&{distanceKm?:number})[]>([]); const [selectedWorkshop,setSelectedWorkshop]=useState("");
   const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false); const [loadingSlots,setLoadingSlots]=useState(false);
-  const [demoAccess,setDemoAccess]=useState(false); const [demoLoaded,setDemoLoaded]=useState(false);
+  const [autogermaBonus,setAutogermaBonus]=useState(0); const [bonusLoaded,setBonusLoaded]=useState(false);
   const selected=VERIDRIVE_SERVICES[service];
+  const selectedWorkshopData=workshops.find((workshop)=>workshop.id===selectedWorkshop) ?? null;
+  const isAutogerma=selectedWorkshopData?.display_name?.toLowerCase().includes("autogerma") ?? false;
+  const hasFreeAutogermaBooking=!selected.workshop || !isAutogerma ? false : autogermaBonus>0;
   const price=useMemo(()=>(selected.priceCents+(urgency?2500:0))/100,[selected.priceCents,urgency]);
   const isOnline=service==="check_online";
   const customerServices=[...new Set([...CUSTOMER_SERVICE_GROUPS.own_car,...CUSTOMER_SERVICE_GROUPS.buying_used])] as ServiceKey[];
 
   useEffect(()=>{
     void fetch("/api/customer/bookings",{cache:"no-store"})
-      .then(async response=>{ if(!response.ok){setDemoLoaded(true);return;} const data=await response.json(); setDemoAccess(Boolean(data.customer?.demo_access)); setDemoLoaded(true); })
-      .catch(()=>setDemoLoaded(true));
+      .then(async response=>{ if(!response.ok){setBonusLoaded(true);return;} const data=await response.json(); setAutogermaBonus(Number(data.customer?.autogerma_free_booking_bonus ?? 0)); setBonusLoaded(true); })
+      .catch(()=>setBonusLoaded(true));
   },[]);
 
   async function refreshAvailability(nextService=service,nextDate=date,nextUrgency=urgency){
@@ -61,11 +64,15 @@ export function BookingForm(){
       const reference=String(form.get(referenceType==="plate"?"plate":"listingUrl")??"").trim();
       if(!reference){setMessage(referenceType==="plate"?"Inserisci la targa.":"Incolla il link dell'annuncio.");return;}
       if(!isOnline&&(!date||!slot||!selectedWorkshop)){setMessage("Seleziona officina, data e orario.");return;}
-      const response=await fetch("/api/bookings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({service,referenceType,plate:referenceType==="plate"?reference:null,listingUrl:referenceType==="listing"?reference:null,make:form.get("make"),model:form.get("model"),date:isOnline?null:date,slot:isOnline?null:slot,location:isOnline?null:location,urgency:isOnline?false:urgency,workshopId:isOnline?null:selectedWorkshop})});
+      const useFreeBooking=hasFreeAutogermaBooking;
+      const response=await fetch("/api/bookings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({service,referenceType,plate:referenceType==="plate"?reference:null,listingUrl:referenceType==="listing"?reference:null,make:form.get("make"),model:form.get("model"),date:isOnline?null:date,slot:isOnline?null:slot,location:isOnline?null:location,urgency:isOnline?false:urgency,workshopId:isOnline?null:selectedWorkshop,useFreeBooking})});
       const data=await response.json(); if(!response.ok){setMessage(data.error||"Impossibile creare la prenotazione.");return;}
       const checkoutResponse=await fetch("/api/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bookingId:data.bookingId})});
       const checkout=await checkoutResponse.json(); if(!checkoutResponse.ok){setMessage(checkout.error||"Impossibile completare la prenotazione.");return;}
-      if(checkout.demo){window.location.href=`/dashboard?booked=${data.bookingId}`;return;}
+      if(checkout.demo || checkout.freeBooking){
+        setAutogermaBonus((current)=>checkout.freeBooking?Math.max(0,current-1):current);
+        window.location.href=`/dashboard?booked=${data.bookingId}`;return;
+      }
       if(!checkout.url){setMessage("Prenotazione creata, ma impossibile aprire il pagamento.");return;}
       window.location.href=checkout.url;
     }catch{setMessage("Si è verificato un errore. Riprova tra poco.");}finally{setBusy(false);}
@@ -87,8 +94,9 @@ export function BookingForm(){
     <div className="full panel" style={{marginTop:8}}><p><b>Totale: €{price.toFixed(2).replace('.',',')}</b></p><p style={{marginBottom:0}}>{isOnline?"Nessun appuntamento: il servizio viene preso in carico online dopo il pagamento.":"Gli appuntamenti standard richiedono almeno 48 ore di preavviso. Puoi spostarli una sola volta, gratuitamente, almeno 24 ore prima."}</p></div>
     {selected.certificate&&<div className="full panel" style={{marginTop:0}}><p style={{marginBottom:4}}><b>Certificato VeriDrive incluso</b></p><p style={{marginBottom:0}}>VeriScore, risultato della verifica, certificato digitale e QR pubblico di verifica.</p></div>}
     {selected.photos&&<div className="full panel" style={{marginTop:0}}><p style={{marginBottom:4}}><b>VeriScorePlus</b></p><p style={{marginBottom:0}}>Foto solamente dei difetti riscontrati e stima indicativa dei costi di riparazione.</p></div>}
+    {hasFreeAutogermaBooking&&<div className="full notice" style={{marginTop:0}}>Prenotazione gratuita Autogerma disponibile.</div>}
     {isOnline&&<div className="full notice" style={{marginTop:0}}>Risposta entro 24 ore.</div>}
-    <button className="button full" disabled={busy} type="submit">{busy?"Attendi…":demoLoaded&&demoAccess?"Prenota gratuitamente":`Paga €${price.toFixed(2).replace('.',',')} e continua`}</button>
+    <button className="button full" disabled={busy||!bonusLoaded} type="submit">{busy?"Attendi…":hasFreeAutogermaBooking?"Prenota gratis":`Paga €${price.toFixed(2).replace('.',',')} e continua`}</button>
     {message&&<p className="notice full">{message}</p>}
   </form>;
 }
