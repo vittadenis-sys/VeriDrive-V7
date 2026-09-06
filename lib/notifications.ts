@@ -4,26 +4,10 @@ function getSender() {
   return process.env.EMAIL_FROM ?? "VeriDrive <prenotazioni@veridrive.it>";
 }
 
-async function sendEmail({
-  to,
-  cc,
-  subject,
-  html,
-}: {
-  to: string;
-  cc?: string[];
-  subject: string;
-  html: string;
-}) {
+async function sendEmail({ to, cc, subject, html }: { to: string; cc?: string[]; subject: string; html: string }) {
   if (!process.env.RESEND_API_KEY || !to) return { sent: false, reason: "Email non configurata" };
   const resend = new Resend(process.env.RESEND_API_KEY);
-  await resend.emails.send({
-    from: getSender(),
-    to,
-    ...(cc?.length ? { cc } : {}),
-    subject,
-    html,
-  });
+  await resend.emails.send({ from: getSender(), to, ...(cc?.length ? { cc } : {}), subject, html });
   return { sent: true };
 }
 
@@ -37,16 +21,7 @@ export async function sendBookingConfirmation(to: string, bookingId: string) {
 
 export async function sendWorkshopAssignment(
   to: string,
-  booking: {
-    id: string;
-    plate: string;
-    vehicleMake?: string | null;
-    vehicleModel?: string | null;
-    service: string;
-    date?: string | null;
-    slot?: string | null;
-    urgency?: boolean;
-  },
+  booking: { id: string; plate: string; vehicleMake?: string | null; vehicleModel?: string | null; service: string; date?: string | null; slot?: string | null; urgency?: boolean },
   cc: string[] = [],
 ) {
   const vehicle = [booking.vehicleMake, booking.vehicleModel].filter(Boolean).join(" ") || "Veicolo non specificato";
@@ -64,4 +39,33 @@ export async function sendAdminOrderNotification(to: string, booking: { id: stri
     subject: `Nuovo ordine ${booking.id} – Da emettere`,
     html: `<h1>Nuovo ordine VeriDrive</h1><p>Pratica: <b>${booking.id}</b></p><p>Importo: <b>€${(booking.amountCents / 100).toFixed(2)}</b></p><p>Servizio: <b>${booking.service}</b></p><hr/><p>Cliente: ${booking.customerName}</p><p>Codice fiscale: ${booking.taxCode}</p><p>Residenza: ${booking.residence}</p><p>Telefono: ${booking.phone}</p><p>Email: ${booking.email}</p><p>Officina: ${booking.workshop}</p><p>Data/ora: ${booking.date ?? "-"} ${booking.slot ?? ""}</p>`,
   });
+}
+
+export async function sendBookingOperationalNotifications(booking: {
+  id: string;
+  plate: string;
+  vehicleMake?: string | null;
+  vehicleModel?: string | null;
+  service: string;
+  customerEmail?: string | null;
+  workshopEmail?: string | null;
+  date?: string | null;
+  slot?: string | null;
+  urgency?: boolean;
+}) {
+  const recipients = [booking.workshopEmail, process.env.BOOKINGS_INBOX ?? "prenotazioni@veridrive.it"].filter((email): email is string => Boolean(email));
+  const uniqueRecipients = [...new Set(recipients)];
+  const customerEmail = booking.customerEmail?.trim();
+  const vehicle = [booking.vehicleMake, booking.vehicleModel].filter(Boolean).join(" ") || "Veicolo non specificato";
+  const subject = `Nuova prenotazione VeriDrive ${booking.id}`;
+  const html = `<h1>Nuova prenotazione VeriDrive</h1><p>Pratica: <b>${booking.id}</b></p><p>Veicolo: <b>${vehicle}</b></p><p>Targa: <b>${booking.plate}</b></p><p>Servizio: <b>${booking.service}</b></p><p>Data: <b>${booking.date ?? "-"}</b></p><p>Ora: <b>${booking.slot ?? "-"}</b></p>${booking.urgency ? "<p><b>Urgenza</b></p>" : ""}`;
+
+  const results = [];
+  for (const to of uniqueRecipients) {
+    results.push(await sendEmail({ to, subject, html }));
+  }
+  if (customerEmail) {
+    results.push(await sendEmail({ to: customerEmail, subject: `Ricezione prenotazione VeriDrive ${booking.id}`, html: `<h1>Prenotazione ricevuta</h1><p>La pratica <b>${booking.id}</b> è stata registrata.</p><p>Ti aggiorneremo sulla conferma dell'appuntamento.</p>` }));
+  }
+  return results;
 }
