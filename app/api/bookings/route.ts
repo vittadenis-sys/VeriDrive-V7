@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendBookingConfirmation, sendBookingOperationalNotifications } from "@/lib/notifications";
 import { getCustomerPriceCents, getService, type ServiceKey } from "@/lib/services";
+import { createServiceClient } from "@/lib/supabase/service";
 
 const SERVICE_KEYS: ServiceKey[] = ["check_viaggio", "veriscore", "check_online", "veriscore_plus"];
 
@@ -28,6 +29,8 @@ export async function POST(request: Request) {
   const service = getService(serviceKey)!;
   const isOnline = serviceKey === "check_online";
   const urgency = !isOnline && body.urgency === true;
+  const requestedFreeBooking = body.useFreeBooking === true;
+  const requestedFreeBookingAllowedOnlyAtAutogerma = requestedFreeBooking && !isOnline;
   const customerPriceCents = getCustomerPriceCents(serviceKey, urgency);
   if (customerPriceCents == null) return NextResponse.json({ error: "Impossibile calcolare il prezzo." }, { status: 400 });
 
@@ -50,6 +53,10 @@ export async function POST(request: Request) {
     if (error || !data) return NextResponse.json({ error: "Officina non disponibile." }, { status: 400 });
     workshop = data;
 
+    if (requestedFreeBookingAllowedOnlyAtAutogermaAllowed(workshop.name, requestedFreeBookingAllowedOnlyAtAutogerma)) {
+      return NextResponse.json({ error: "La prenotazione gratuita è disponibile solo presso Autogerma." }, { status: 400 });
+    }
+
     const { data: booked } = await supabase
       .from("bookings")
       .select("id")
@@ -59,6 +66,9 @@ export async function POST(request: Request) {
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
     if ((booked ?? []).length) return NextResponse.json({ error: "Lo slot selezionato non è più disponibile. Aggiorna gli orari e riprova." }, { status: 409 });
   }
+
+  const wantsFreeBooking = requestedFreeBooking && Boolean(workshop) && workshop?.name.toLowerCase().includes("autogerma");
+  const storedPrice = wantsFreeBooking ? 0 : customerPriceCents;
 
   const insertPayload = {
     customer_id: customer.id,
@@ -71,10 +81,24 @@ export async function POST(request: Request) {
     location,
     listing_url: referenceType === "listing" ? reference : null,
     service_key: serviceKey,
-    customer_price_cents: customerPriceCents,
+    customer_price_cents: storedPrice,
     urgency,
     urgency_price_cents: urgency ? 2500 : 0,
+    paid_with_autogerma_bonus: wantsFreeBooking,
   };
+
+  if (wantsFreeBooking) {
+    const db = createServiceClient();
+    const { data: claimedCustomer, error: claimError } = await db
+      .from("customers")
+      .update({ autogerma_free_booking_bonus: customerFreeBonusDecrement() })
+      .eq("id", customer.id)
+      .gt("autogerma_free_booking_bonus", 0)
+      .select("id,autogerma_free_booking_bonus")
+      .maybeSingle();
+    if (claimError) return NextResponse.json({ error: "Impossibile verificare il bonus gratuito." }, { status: 500 });
+    if (!claimedCustomer) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita non è più disponibile." }, { status: 409 });
+  }
 
   const { data, error } = await supabase.from("bookings").insert(insertPayload).select("id,practice_code").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -93,5 +117,13 @@ export async function POST(request: Request) {
     urgency,
   });
 
-  return NextResponse.json({ bookingId: data.id, practiceNumber: data.practice_code, service: service.key });
+  return NextResponse.json({ bookingId: data.id, practiceNumber: data.practice_code, service: service.key, freeBooking: wantsFreeBooking });
+}
+
+function customerFreeBonusDecrement() {
+  return 0;
+}
+
+function requestedFreeBookingAllowedOnlyAtAutogermaAllowed(workshopName: string, requested: boolean) {
+  return requested && !workshopName.toLowerCase().includes("autogerma");
 }
