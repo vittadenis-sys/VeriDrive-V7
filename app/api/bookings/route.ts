@@ -11,15 +11,6 @@ function isValidDate(value: unknown) {
   return !Number.isNaN(parsed.getTime());
 }
 
-function createPracticeNumber() {
-  const stamp = new Date();
-  const yyyy = stamp.getFullYear();
-  const mm = String(stamp.getMonth() + 1).padStart(2, "0");
-  const dd = String(stamp.getDate()).padStart(2, "0");
-  const suffix = String(Math.floor(Math.random() * 900) + 100);
-  return `VRD-${yyyy}${mm}${dd}-${suffix}`;
-}
-
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 }); }
@@ -69,7 +60,6 @@ export async function POST(request: Request) {
     if ((booked ?? []).length) return NextResponse.json({ error: "Lo slot selezionato non è più disponibile. Aggiorna gli orari e riprova." }, { status: 409 });
   }
 
-  const practiceNumber = createPracticeNumber();
   const insertPayload = {
     customer_id: customer.id,
     workshop_id: workshop?.id ?? null,
@@ -86,7 +76,7 @@ export async function POST(request: Request) {
     urgency_price_cents: urgency ? 2500 : 0,
   };
 
-  const { data, error } = await supabase.from("bookings").insert(insertPayload).select("id").single();
+  const { data, error } = await supabase.from("bookings").insert(insertPayload).select("id,practice_code").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   await sendBookingConfirmation(user.email ?? "", data.id);
@@ -103,5 +93,5 @@ export async function POST(request: Request) {
     urgency,
   });
 
-  return NextResponse.json({ bookingId: data.id, practiceNumber, service: service.key });
+  return NextResponse.json({ bookingId: data.id, practiceNumber: data.practice_code, service: service.key });
 }
