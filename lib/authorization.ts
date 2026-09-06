@@ -1,14 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export async function requireAdmin() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const allowed = (process.env.ADMIN_EMAILS ?? "admin@veridrive.it")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
+  if (!user) throw new Error("Unauthorized");
 
-  if (!user?.email || !allowed.includes(user.email.toLowerCase())) {
+  const db = createServiceClient();
+  const { data: admin, error } = await db
+    .from("admins")
+    .select("id, role")
+    .eq("auth_id", user.id)
+    .maybeSingle();
+
+  if (error || !admin || !["admin", "super_admin"].includes(admin.role)) {
     throw new Error("Unauthorized");
   }
 
