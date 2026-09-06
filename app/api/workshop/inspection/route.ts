@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireWorkshopOwner } from "@/lib/authorization";
 import { createServiceClient } from "@/lib/supabase/service";
+import { calculateWeightedVeriscore } from "@/lib/veriscore";
 
 export async function PUT(request: Request) {
   try {
@@ -10,14 +11,7 @@ export async function PUT(request: Request) {
       checklist?: Array<{ id: number; area: string; label: string; result: "ok" | "issue" | "critical" | null }>;
       notes?: string;
       close?: boolean;
-      vehicle?: {
-        plate?: string | null;
-        make?: string | null;
-        model?: string | null;
-        year?: number | null;
-        vin?: string | null;
-        mileage?: number | null;
-      };
+      vehicle?: { plate?: string | null; make?: string | null; model?: string | null; year?: number | null; vin?: string | null; mileage?: number | null };
     };
 
     const bookingId = String(body.bookingId ?? "").trim();
@@ -30,11 +24,9 @@ export async function PUT(request: Request) {
     const { data: workshop } = await db.from("workshops").select("id").eq("owner_auth_id", user.id).single();
     if (!workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
 
-    const { data: booking } = await db
-      .from("bookings")
+    const { data: booking } = await db.from("bookings")
       .select("id,workshop_id,status,service_key,plate,vehicle_make,vehicle_model,vehicle_year,vin,vehicle_mileage")
-      .eq("id", bookingId)
-      .single();
+      .eq("id", bookingId).single();
     if (!booking || booking.workshop_id !== workshop.id) return NextResponse.json({ error: "Pratica non trovata." }, { status: 404 });
 
     const isCertificateService = ["veriscore", "veriscore_plus"].includes(booking.service_key);
@@ -52,19 +44,13 @@ export async function PUT(request: Request) {
       if (nextMileage == null || Number.isNaN(nextMileage) || nextMileage < 0) return NextResponse.json({ error: "Per chiudere la pratica servono i chilometri." }, { status: 400 });
     }
 
+    const results = Object.fromEntries(checklistResults.map((item) => [item.id, item.result ?? undefined]));
     const passedChecks = checklistResults.filter((item) => item.result === "ok").length;
-    const veriscore = Math.round((passedChecks / 50) * 100);
+    const veriscore = calculateWeightedVeriscore(results);
     const { data: existing } = await db.from("inspections").select("id").eq("booking_id", bookingId).maybeSingle();
 
     if (isCertificateService) {
-      const { error: vehicleError } = await db.from("bookings").update({
-        plate: nextPlate,
-        vehicle_make: nextMake,
-        vehicle_model: nextModel,
-        vehicle_year: nextYear,
-        vin: nextVin,
-        vehicle_mileage: nextMileage,
-      }).eq("id", bookingId);
+      const { error: vehicleError } = await db.from("bookings").update({ plate: nextPlate, vehicle_make: nextMake, vehicle_model: nextModel, vehicle_year: nextYear, vin: nextVin, vehicle_mileage: nextMileage }).eq("id", bookingId);
       if (vehicleError) return NextResponse.json({ error: vehicleError.message }, { status: 400 });
     }
 
@@ -77,9 +63,7 @@ export async function PUT(request: Request) {
       completed_at: body.close ? new Date().toISOString() : existing ? undefined : null,
     };
 
-    const query = existing
-      ? db.from("inspections").update(payload).eq("id", existing.id)
-      : db.from("inspections").insert(payload);
+    const query = existing ? db.from("inspections").update(payload).eq("id", existing.id) : db.from("inspections").insert(payload);
     const { error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ ok: true, passedChecks, veriscore });
