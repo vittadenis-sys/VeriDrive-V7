@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Header } from "@/components/Header";
 
 type Workshop = { id: string; display_name: string; city: string | null; address: string | null; postal_code: string | null; availableSlots: string[] };
-type Booking = { id: string; plate: string; vehicle_make: string | null; vehicle_model: string | null; requested_date: string | null; requested_slot: string | null; status: string; service_key: string; urgency: boolean; workshop_id: string | null };
+type Booking = { id: string; practice_code: string | null; plate: string; vehicle_make: string | null; vehicle_model: string | null; requested_date: string | null; requested_slot: string | null; status: string; service_key: string; urgency: boolean; workshop_id: string | null };
 
 const SERVICE_NAMES: Record<string,string> = { check_viaggio: "Check Viaggio", veriscore: "Check-up + VeriScore", check_online: "Check Online", veriscore_plus: "Check-up + VeriScorePlus" };
 
@@ -13,12 +13,14 @@ export default function AdminBookings() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [selectedBooking, setSelectedBooking] = useState("");
+  const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function load() {
+  async function load(nextSearch = search) {
+    const query = nextSearch.trim() ? `?search=${encodeURIComponent(nextSearch.trim())}` : "";
     const [bookingResponse, workshopResponse] = await Promise.all([
-      fetch("/api/admin/bookings", { cache: "no-store" }),
+      fetch(`/api/admin/bookings${query}`, { cache: "no-store" }),
       fetch("/api/admin/workshops/overview", { cache: "no-store" }),
     ]);
     const bookingData = await bookingResponse.json();
@@ -63,12 +65,16 @@ export default function AdminBookings() {
   return <><Header/><main className="page"><div className="shell">
     <Link href="/admin">← Amministrazione</Link>
     <div className="eyebrow" style={{ marginTop: 24 }}>Gestione pratiche</div>
-    <h1 style={{ fontSize: "clamp(38px,6vw,54px)" }}>Assegnazione officina</h1>
-    <p className="lead">Scegli una pratica e assegna un'officina attiva mostrando solo gli slot realmente disponibili.</p>
+    <h1 style={{ fontSize: "clamp(38px,6vw,54px)" }}>Prenotazioni</h1>
+    <p className="lead">Cerca per codice pratica, targa o veicolo e assegna l'officina con lo slot realmente disponibile.</p>
+    <div className="panel" style={{ marginTop: 20, display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10 }}>
+      <input value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void load(search); }} placeholder="Cerca VD-02481, targa o veicolo" />
+      <button type="button" className="button" onClick={() => void load(search)}>Cerca</button>
+    </div>
     {message && <p className="notice">{message}</p>}
     <section className="panel" style={{ marginTop: 24 }}>
-      <label>Pratica<select value={selectedBooking} onChange={(e)=>setSelectedBooking(e.target.value)}><option value="">Seleziona una pratica</option>{bookings.filter(b=>b.status !== "completed" && b.status !== "cancelled").map((b)=><option key={b.id} value={b.id}>{b.id} · {b.plate} · {SERVICE_NAMES[b.service_key] ?? b.service_key}</option>)}</select></label>
-      {current && <div style={{ marginTop: 18 }}><div className="card"><strong>{[current.vehicle_make,current.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</strong><p style={{ marginBottom: 4 }}>{current.plate} · {current.requested_date ?? "Data non impostata"} {current.requested_slot ?? ""}</p><span className="badge">{current.urgency ? "Urgenza" : "Standard"}</span><div style={{ marginTop:8,fontSize:13,opacity:.75 }}>Stato: {current.status} · {current.workshop_id ? "Officina già assegnata" : "In attesa di assegnazione"}</div></div></div>}
+      <label>Pratica<select value={selectedBooking} onChange={(e)=>setSelectedBooking(e.target.value)}><option value="">Seleziona una pratica</option>{bookings.filter(b=>b.status !== "completed" && b.status !== "cancelled").map((b)=><option key={b.id} value={b.id}>{b.practice_code ?? b.id} · {b.plate} · {SERVICE_NAMES[b.service_key] ?? b.service_key}</option>)}</select></label>
+      {current && <div style={{ marginTop: 18 }}><div className="card"><strong>{current.practice_code ?? current.id}</strong><p style={{ margin: "6px 0 4px" }}>{[current.vehicle_make,current.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</p><p style={{ marginBottom: 4 }}>{current.plate} · {current.requested_date ?? "Data non impostata"} {current.requested_slot ?? ""}</p><span className="badge">{current.urgency ? "Urgenza" : "Standard"}</span><div style={{ marginTop:8,fontSize:13,opacity:.75 }}>Stato: {current.status} · {current.workshop_id ? "Officina già assegnata" : "In attesa di assegnazione"}</div></div></div>}
     </section>
     <section style={{ padding: "28px 0" }}>
       <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))" }}>
