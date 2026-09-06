@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Header } from "@/components/Header";
 
 type Customer = {
@@ -13,18 +14,24 @@ type Customer = {
 
 export default function AdminClientiPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    void fetch("/api/admin/customers", { cache: "no-store" })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Impossibile caricare i clienti.");
-        setCustomers(data.customers ?? []);
-      })
-      .catch((error) => setMessage(error instanceof Error ? error.message : "Errore."));
-  }, []);
+  async function load(nextSearch = search) {
+    try {
+      const query = nextSearch.trim() ? `?search=${encodeURIComponent(nextSearch.trim())}` : "";
+      const response = await fetch(`/api/admin/customers${query}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Impossibile caricare i clienti.");
+      setCustomers(data.customers ?? []);
+      setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Errore.");
+    }
+  }
+
+  useEffect(() => { void load(""); }, []);
 
   async function toggleDemo(customer: Customer) {
     setBusyId(customer.id);
@@ -48,12 +55,17 @@ export default function AdminClientiPage() {
   return <>
     <Header />
     <main className="page"><div className="shell">
-      <div className="eyebrow">AMMINISTRAZIONE</div>
+      <Link href="/admin">← Amministrazione</Link>
+      <div className="eyebrow" style={{ marginTop: 24 }}>AMMINISTRAZIONE</div>
       <h1>Clienti</h1>
-      <p className="lead">Gestisci l'accesso demo ai servizi B2C.</p>
+      <p className="lead">Ricerca rapida per nome o telefono e gestione dell'accesso demo B2C.</p>
+      <div className="panel" style={{ marginTop: 20, display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10 }}>
+        <input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void load(search); }} placeholder="Cerca nome o telefono" />
+        <button type="button" className="button" onClick={() => void load(search)}>Cerca</button>
+      </div>
       {message && <p className="notice">{message}</p>}
       <section className="panel" style={{ marginTop: 20 }}>
-        {customers.length === 0 ? <p style={{ marginBottom: 0 }}>Nessun cliente registrato.</p> : <div style={{ display: "grid", gap: 12 }}>
+        {customers.length === 0 ? <p style={{ marginBottom: 0 }}>Nessun cliente trovato.</p> : <div style={{ display: "grid", gap: 12 }}>
           {customers.map((customer) => <div key={customer.id} className="card" style={{ display: "flex", gap: 16, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
             <div>
               <strong>{customer.full_name || "Cliente senza nome"}</strong>
