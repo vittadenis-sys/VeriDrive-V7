@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CarFront, Gauge, QrCode, SearchCheck, ShieldCheck } from "lucide-react";
+import { ArrowRight, CarFront, Gauge, QrCode, SearchCheck, ShieldCheck, PlaneTakeoff } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VeriScore } from "@/components/VeriScore";
@@ -42,6 +42,8 @@ export default function Home() {
             <article className="journey card"><div className="journey-heading"><div className="icon"><SearchCheck size={24} /></div><div><div className="eyebrow">STAI ACQUISTANDO UN'AUTO</div><h3>Devi comprarla</h3></div></div><div className="service-list">{purchaseServices.map(service=><Link key={service.href} className={`service-item ${service.featured?"featured":""}`} href={service.href}><div>{service.featured&&<span className="recommended">PIÙ SCELTA</span>}<strong>{service.name}</strong><span>{service.description}</span></div><div className="service-price">{service.price}<ArrowRight size={18}/></div></Link>)}</div></article>
           </div>
         </div></section>
+
+        <section className="panel-section" style={{ padding: "36px 0" }}><div className="shell"><div className="journey card" style={{ display: "grid", gap: 18 }}><div className="journey-heading"><div className="icon"><PlaneTakeoff size={24} /></div><div><div className="eyebrow">PRIMA DI PARTIRE</div><h3>Check Viaggio: scopri quanto è affidabile la tua auto per il prossimo viaggio.</h3></div></div><p className="lead" style={{ marginBottom: 4 }}>Una checklist dedicata ai principali elementi di sicurezza, con un <strong>Indice Affidabilità Viaggio da 0 a 10</strong>. Non è un VeriScore: ti dice semplicemente quanto la vettura è pronta per affrontare il viaggio.</p><div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}><Link className="button" href="/prenota?service=check_viaggio&path=own_car">Prenota Check Viaggio <ArrowRight size={18}/></Link><span style={{ opacity: .72 }}>Ideale prima di ferie, weekend e lunghi viaggi.</span></div></div></div></section>
 
         <section className="panel-section veriscore-section"><div className="shell veriscore-showcase"><div><div className="eyebrow">VERISCORE®</div><h2>Un numero per capire subito il risultato.</h2><p className="lead">Il VeriScore sintetizza l'esito della verifica in un formato chiaro e leggibile.</p></div><div className="veriscore-demo card"><VeriScore score={92} size={176}/><div><strong>92/100</strong><span>Anteprima grafica</span><small>Il punteggio reale viene generato dalla checklist della verifica.</small></div></div></div></section>
         <section className="panel"><div className="shell cta-panel"><div><div className="eyebrow">PRONTO?</div><h2>Conosci prima. Decidi meglio.</h2><p>Seleziona il servizio più adatto alla tua situazione.</p></div><Link className="button" href="/prenota">Prenota <ArrowRight size={18}/></Link></div></section>
