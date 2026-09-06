@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
 
 export async function requireAdmin() {
   const supabase = await createClient();
@@ -10,8 +9,7 @@ export async function requireAdmin() {
 
   if (authError || !user) throw new Error("Unauthorized");
 
-  const db = createServiceClient();
-  const { data: admin, error: adminError } = await db
+  const { data: admin, error: adminError } = await supabase
     .from("admins")
     .select("auth_id, role")
     .eq("auth_id", user.id)
