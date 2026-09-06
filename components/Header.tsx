@@ -56,9 +56,15 @@ export function Header() {
             <ChevronDown className={servicesOpen ? "mobile-submenu-chevron is-open" : "mobile-submenu-chevron"} size={20} aria-hidden="true" />
           </button>
 
-          <div id="mobile-services" className={servicesOpen ? "mobile-submenu-items is-open" : "mobile-submenu-items"}>
-            <Link href="/auto" onClick={closeMenu}>La tua auto</Link>
-            <Link href="/acquisto-auto-usata" onClick={closeMenu}>Stai acquistando un'auto</Link>
+          <div
+            id="mobile-services"
+            className={servicesOpen ? "mobile-submenu-items is-open" : "mobile-submenu-items"}
+            aria-hidden={!servicesOpen}
+          >
+            <div className="mobile-submenu-items-inner">
+              <Link href="/auto" onClick={closeMenu}>La tua auto</Link>
+              <Link href="/acquisto-auto-usata" onClick={closeMenu}>Stai acquistando un'auto</Link>
+            </div>
           </div>
 
           {links.map(([href, label]) => <Link key={href} href={href} onClick={closeMenu}>{label}</Link>)}
