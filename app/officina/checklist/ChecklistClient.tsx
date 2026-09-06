@@ -11,6 +11,15 @@ type Props = { bookingId: string };
 
 type InspectionResponse = {
   inspection?: { checklist?: Array<{ id: number; result: Result | null }>; notes?: string | null };
+  booking?: {
+    service_key?: string | null;
+    plate?: string | null;
+    vehicle_make?: string | null;
+    vehicle_model?: string | null;
+    vehicle_year?: number | null;
+    vin?: string | null;
+    vehicle_mileage?: number | null;
+  };
 };
 
 export default function ChecklistClient({ bookingId }: Props) {
@@ -19,10 +28,22 @@ export default function ChecklistClient({ bookingId }: Props) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [vehicle, setVehicle] = useState({
+    plate: "",
+    make: "",
+    model: "",
+    year: "",
+    vin: "",
+    mileage: "",
+    serviceKey: "",
+  });
 
+  const isCertificateService = vehicle.serviceKey === "veriscore" || vehicle.serviceKey === "veriscore_plus";
   const score = useMemo(() => calculateVeriscore(checklist.map((item) => values[item.id] === "ok")), [values]);
   const completed = Object.values(values).filter(Boolean).length;
-  const canClose = completed === checklist.length;
+  const canCloseChecklist = completed === checklist.length;
+  const hasVehicleIdentity = !isCertificateService || Boolean(vehicle.plate.trim() && vehicle.vin.trim() && vehicle.mileage.trim() && Number(vehicle.mileage) >= 0);
+  const canClose = canCloseChecklist && hasVehicleIdentity;
 
   useEffect(() => {
     let active = true;
@@ -37,6 +58,16 @@ export default function ChecklistClient({ bookingId }: Props) {
         for (const item of saved) if (item.result) next[item.id] = item.result;
         setValues(next);
         setNotes(data.inspection?.notes ?? "");
+        const booking = data.booking;
+        setVehicle({
+          plate: booking?.plate ?? "",
+          make: booking?.vehicle_make ?? "",
+          model: booking?.vehicle_model ?? "",
+          year: booking?.vehicle_year != null ? String(booking.vehicle_year) : "",
+          vin: booking?.vin ?? "",
+          mileage: booking?.vehicle_mileage != null ? String(booking.vehicle_mileage) : "",
+          serviceKey: booking?.service_key ?? "",
+        });
       } finally {
         if (active) setLoading(false);
       }
@@ -58,7 +89,20 @@ export default function ChecklistClient({ bookingId }: Props) {
       const response = await fetch("/api/workshop/inspection", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, checklist: checklistResults, notes, close }),
+        body: JSON.stringify({
+          bookingId,
+          checklist: checklistResults,
+          notes,
+          close,
+          vehicle: isCertificateService ? {
+            plate: vehicle.plate.trim().toUpperCase(),
+            make: vehicle.make.trim(),
+            model: vehicle.model.trim(),
+            year: vehicle.year ? Number(vehicle.year) : null,
+            vin: vehicle.vin.trim().toUpperCase(),
+            mileage: vehicle.mileage === "" ? null : Number(vehicle.mileage),
+          } : undefined,
+        }),
       });
       const data = await response.json() as { error?: string; veriscore?: number };
       if (!response.ok) throw new Error(data.error ?? "Salvataggio non riuscito.");
@@ -86,12 +130,29 @@ export default function ChecklistClient({ bookingId }: Props) {
         <div className="eyebrow" style={{ marginTop: 24 }}>Pratica {bookingId}</div>
         <h1 style={{ fontSize: "clamp(34px, 6vw, 48px)" }}>Checklist tecnica</h1>
 
-        <div className="panel" style={{ position: "sticky", top: 86, zIndex: 2, display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+        {isCertificateService && (
+          <section className="panel" style={{ marginTop: 18 }}>
+            <div className="eyebrow">DATI VEICOLO · CERTIFICATO</div>
+            <h3>Conferma i dati prima della chiusura</h3>
+            <p style={{ opacity: .75 }}>Il cliente può aver lasciato il telaio o i chilometri vuoti. L'officina deve completarli prima di chiudere la pratica.</p>
+            <div className="form" style={{ marginTop: 12 }}>
+              <label>Targa<input value={vehicle.plate} onChange={(e) => { setVehicle((v) => ({ ...v, plate: e.target.value })); setMessage(""); }} /></label>
+              <label>Marca<input value={vehicle.make} onChange={(e) => setVehicle((v) => ({ ...v, make: e.target.value }))} /></label>
+              <label>Modello<input value={vehicle.model} onChange={(e) => setVehicle((v) => ({ ...v, model: e.target.value }))} /></label>
+              <label>Anno<input value={vehicle.year} inputMode="numeric" onChange={(e) => setVehicle((v) => ({ ...v, year: e.target.value }))} /></label>
+              <label className="full">Telaio / VIN<input value={vehicle.vin} onChange={(e) => { setVehicle((v) => ({ ...v, vin: e.target.value.toUpperCase() })); setMessage(""); }} placeholder="Inserisci il VIN completo" /></label>
+              <label className="full">Chilometri<input value={vehicle.mileage} type="number" min="0" step="1" inputMode="numeric" onChange={(e) => { setVehicle((v) => ({ ...v, mileage: e.target.value })); setMessage(""); }} placeholder="Es. 48230" /></label>
+            </div>
+            {!hasVehicleIdentity && <p className="notice" style={{ marginTop: 12 }}>Per chiudere VeriScore o VeriScorePlus servono targa, VIN e chilometraggio.</p>}
+          </section>
+        )}
+
+        <div className="panel" style={{ position: "sticky", top: 86, zIndex: 2, display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", marginTop: 18 }}>
           <VeriScore score={score} size={92} />
           <div>
             <p style={{ marginBottom: 6 }}><b>{score}/100 · {scoreLabel(score)}</b></p>
             <p style={{ margin: 0 }}>{completed}/{checklist.length} controlli compilati</p>
-            {!canClose && <small style={{ display: "block", marginTop: 6, opacity: .7 }}>Completa tutti i controlli per chiudere la pratica.</small>}
+            {!canCloseChecklist && <small style={{ display: "block", marginTop: 6, opacity: .7 }}>Completa tutti i controlli per chiudere la pratica.</small>}
           </div>
         </div>
 
@@ -119,7 +180,7 @@ export default function ChecklistClient({ bookingId }: Props) {
 
         <div className="actions" style={{ marginTop: 24 }}>
           <button type="button" className="button" onClick={() => void saveInspection(false)} disabled={busy || loading || !completed}>Salva ispezione</button>
-          {canClose && <button type="button" className="button" onClick={() => void saveInspection(true)} disabled={busy || loading}>Chiudi verifica</button>}
+          <button type="button" className="button" onClick={() => void saveInspection(true)} disabled={busy || loading || !canClose}>{isCertificateService ? "Chiudi e genera certificato" : "Chiudi verifica"}</button>
         </div>
 
         {message && <p className="notice" style={{ marginTop: 16 }}>{message}</p>}
