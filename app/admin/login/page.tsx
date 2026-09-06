@@ -21,10 +21,10 @@ export default function AdminLogin() {
         password,
       });
 
-      console.log("LOGIN_RESULT", {
-        ok: !error,
-        error: error?.message,
-        hasSession: Boolean(data.session),
+      console.log("SUPABASE_LOGIN", {
+        session: Boolean(data.session),
+        user: data.user?.email ?? null,
+        error: error?.message ?? null,
       });
 
       if (error) {
@@ -33,13 +33,15 @@ export default function AdminLogin() {
       }
 
       if (!data.session) {
-        setMessage("Accesso non completato: nessuna sessione ricevuta.");
+        setMessage("Nessuna sessione ricevuta da Supabase.");
         return;
       }
 
       window.location.assign("/admin");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Errore durante l'accesso.");
+      const text = error instanceof Error ? error.message : "Errore durante l'accesso.";
+      console.error("SUPABASE_LOGIN_EXCEPTION", error);
+      setMessage(text);
     } finally {
       setBusy(false);
     }
