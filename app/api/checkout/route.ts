@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getService, getCustomerPriceCents } from "@/lib/services";
 
 export async function POST(request: Request) {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return NextResponse.json({ error: "Pagamento non configurato" }, { status: 503 });
-  }
-
   const { bookingId } = await request.json();
   if (!bookingId) return NextResponse.json({ error: "bookingId mancante" }, { status: 400 });
 
@@ -17,10 +14,9 @@ export async function POST(request: Request) {
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("id")
+    .select("id,demo_access")
     .eq("auth_id", user.id)
     .single();
-
   if (!customer) return NextResponse.json({ error: "Profilo cliente non disponibile." }, { status: 400 });
 
   const { data: booking, error: bookingError } = await supabase
@@ -30,8 +26,24 @@ export async function POST(request: Request) {
     .eq("customer_id", customer.id)
     .single();
 
-  if (bookingError || !booking) {
-    return NextResponse.json({ error: "Prenotazione non trovata." }, { status: 404 });
+  if (bookingError || !booking) return NextResponse.json({ error: "Prenotazione non trovata." }, { status: 404 });
+
+  const service = getService(String(booking.service_key));
+  if (!service) return NextResponse.json({ error: "Servizio della prenotazione non valido." }, { status: 400 });
+
+  if (customer.demo_access) {
+    const db = createServiceClient();
+    const { error } = await db
+      .from("bookings")
+      .update({ payment_status: "paid" })
+      .eq("id", booking.id)
+      .eq("customer_id", customer.id);
+    if (error) return NextResponse.json({ error: "Impossibile confermare la prenotazione demo." }, { status: 500 });
+    return NextResponse.json({ demo: true, bookingId: booking.id, url: null });
+  }
+
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ error: "Pagamento non configurato" }, { status: 503 });
   }
 
   if (booking.stripe_checkout_session_id) {
@@ -39,9 +51,6 @@ export async function POST(request: Request) {
     const existing = await stripe.checkout.sessions.retrieve(booking.stripe_checkout_session_id);
     if (existing.url) return NextResponse.json({ url: existing.url });
   }
-
-  const service = getService(String(booking.service_key));
-  if (!service) return NextResponse.json({ error: "Servizio della prenotazione non valido." }, { status: 400 });
 
   const storedAmount = Number(booking.customer_price_cents ?? 0);
   if (!storedAmount) return NextResponse.json({ error: "Importo della prenotazione non valido." }, { status: 400 });
