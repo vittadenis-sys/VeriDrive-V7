@@ -2,30 +2,40 @@
 
 import { useState } from "react";
 import { Header } from "@/components/Header";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase";
 
 export default function AdminLogin() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function login(form: FormData) {
-    if (!supabase) { setMessage("Servizio di accesso non configurato."); return; }
     setBusy(true); setMessage("");
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (error) { setMessage(error.message); return; }
-    window.location.assign("/admin");
+    try {
+      const client = createClient();
+      const { error } = await client.auth.signInWithPassword({ email, password });
+      if (error) setMessage(error.message);
+      else window.location.assign("/admin");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Errore durante l'accesso.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function reset(form: FormData) {
-    if (!supabase) { setMessage("Servizio di accesso non configurato."); return; }
     setBusy(true); setMessage("");
     const email = String(form.get("email") ?? "").trim();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/admin/reset-password` });
-    setBusy(false);
-    setMessage(error ? error.message : "Controlla la tua email per il link di recupero.");
+    try {
+      const client = createClient();
+      const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/admin/reset-password` });
+      setMessage(error ? error.message : "Controlla la tua email per il link di recupero.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Errore durante il recupero password.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return <><Header/><main className="page"><div className="shell" style={{maxWidth:600}}>
