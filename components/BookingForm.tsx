@@ -73,7 +73,10 @@ export function BookingForm(){
         setAutogermaBonus((current)=>checkout.freeBooking?Math.max(0,current-1):current);
         window.location.href=`/dashboard?booked=${data.bookingId}`;return;
       }
-      if(!checkout.url){setMessage("Prenotazione creata, ma impossibile aprire il pagamento.");return;}
+      if(checkout.unavailable){
+        window.location.href="/pagamento-non-disponibile";return;
+      }
+      if(!checkout.url){setMessage("Impossibile completare la prenotazione.");return;}
       window.location.href=checkout.url;
     }catch{setMessage("Si è verificato un errore. Riprova tra poco.");}finally{setBusy(false);}
   }
