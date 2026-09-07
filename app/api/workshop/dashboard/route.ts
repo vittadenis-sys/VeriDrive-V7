@@ -13,24 +13,33 @@ export async function GET() {
       .eq("owner_auth_id", user.id)
       .maybeSingle();
 
-    // A super-admin can open the workshop area too. In that case the logged-in
-    // account may not be the owner of a workshop, so fall back to the first
-    // workshop instead of exposing a configuration error to the UI.
     let resolvedWorkshop = workshop;
-    if (!resolvedWorkshop && workshopError && !workshopError.message.includes("SUPABASE_SERVICE_ROLE_KEY")) {
-      throw workshopError;
-    }
+    let isSuperAdmin = false;
+
     if (!resolvedWorkshop) {
-      const { data: firstWorkshop, error: firstWorkshopError } = await db
-        .from("workshops")
-        .select("id,name,city,address,postal_code")
-        .order("created_at", { ascending: true })
-        .limit(1)
+      const { data: admin } = await db
+        .from("admins")
+        .select("role")
+        .eq("auth_id", user.id)
         .maybeSingle();
-      if (firstWorkshopError || !firstWorkshop) {
+
+      if (admin?.role === "super_admin") {
+        isSuperAdmin = true;
+        const { data: firstWorkshop, error: firstWorkshopError } = await db
+          .from("workshops")
+          .select("id,name,city,address,postal_code")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (firstWorkshopError || !firstWorkshop) {
+          return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
+        }
+        resolvedWorkshop = firstWorkshop;
+      } else if (workshopError) {
+        throw workshopError;
+      } else {
         return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
       }
-      resolvedWorkshop = firstWorkshop;
     }
 
     const { data: bookings, error } = await db
@@ -51,11 +60,11 @@ export async function GET() {
       payout: payoutByBooking.get(booking.id) ?? null,
     }));
 
-    return NextResponse.json({ workshop: resolvedWorkshop, bookings: enriched });
+    return NextResponse.json({ workshop: resolvedWorkshop, bookings: enriched, isSuperAdmin });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Non autorizzato";
     if (message.includes("SUPABASE_SERVICE_ROLE_KEY")) {
-      return NextResponse.json({ error: "Configurazione tecnica incompleta: SUPABASE_SERVICE_ROLE_KEY" }, { status: 500 });
+      return NextResponse.json({ error: "Impossibile caricare i dati dell'officina." }, { status: 500 });
     }
     return NextResponse.json({ error: message }, { status: 401 });
   }
