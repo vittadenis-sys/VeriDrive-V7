@@ -6,7 +6,7 @@ import { Menu, X, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 const links = [
-  ["/dashboard", "Area Cliente"],
+  ["/cliente", "Area Cliente"],
   ["/commercianti", "Commercianti"],
   ["/officina", "Officine"],
 ] as const;
@@ -53,9 +53,7 @@ export function Header() {
               <Link href="/acquisto-auto-usata" onClick={closeMenu}>Stai acquistando un'auto</Link>
             </div>
           </div>
-          <Link href="/dashboard" onClick={closeMenu}>Area Cliente</Link>
-          <Link href="/commercianti" onClick={closeMenu}>Commercianti</Link>
-          <Link href="/officina" onClick={closeMenu}>Officine</Link>
+          {links.map(([href, label]) => <Link key={href} href={href} onClick={closeMenu}>{label}</Link>)}
           <Link className="button" href="/prenota" onClick={closeMenu}>Prenota</Link>
         </div>
       )}
