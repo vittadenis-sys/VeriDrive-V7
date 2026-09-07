@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, X, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 const links = [
@@ -67,6 +67,7 @@ export function Header() {
 
           {links.map(([href, label]) => <Link key={href} href={href} onClick={closeMenu}>{label}</Link>)}
           <Link className="button" href="/prenota" onClick={closeMenu}>Prenota</Link>
+          <Link className="button secondary mobile-admin-shortcut" href="/admin" onClick={closeMenu}><ShieldCheck size={18}/> Admin</Link>
         </div>
       )}
     </header>
