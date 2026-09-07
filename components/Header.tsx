@@ -34,9 +34,7 @@ export function Header() {
         </Link>
 
         <nav aria-label="Navigazione principale">
-          <div className="desktop-services">
-            <Link href="/#percorsi">Servizi</Link>
-          </div>
+          <Link href="/#percorsi">Servizi</Link>
           {links.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
         </nav>
 
