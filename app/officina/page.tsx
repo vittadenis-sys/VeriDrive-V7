@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ClipboardList, Euro, Home, UserRound, Settings, Clock3 } from "lucide-react";
+import { CalendarDays, ClipboardList, Euro, Home, UserRound, Settings, Clock3, ShieldCheck } from "lucide-react";
 import { Header } from "@/components/Header";
 
 type Booking = {
@@ -102,65 +102,71 @@ export default function Officina() {
   return (
     <>
       <Header />
-      <div className="dashboard">
-        <aside className="side" style={{ paddingBottom: 96 }}>
-          <div style={{ marginBottom: 24 }}>
+      <div className="dashboard workshop-dashboard">
+        <aside className="side workshop-side" style={{ paddingBottom: 96 }}>
+          <div className="workshop-side-head">
             <div className="eyebrow">Partner VeriDrive</div>
             <h2 style={{ marginBottom: 4 }}>{data?.workshop ? `VeriDrive ${data.workshop.city ?? ""} — ${data.workshop.name}` : "Officina VeriDrive"}</h2>
             <p style={{ margin: 0, opacity: .7, fontSize: 14 }}>Dashboard operativa</p>
           </div>
-          <div style={{ display: "grid", gap: 8 }}>
-            {nav.map(([label, href, Icon]) => <Link key={href} href={href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}><Icon size={19} />{label}</Link>)}
-          </div>
-          <div className="panel" style={{ marginTop: 24 }}>
+          <nav className="workshop-nav" aria-label="Navigazione officina">
+            {nav.map(([label, href, Icon]) => <Link key={label} href={href} className="workshop-nav-link"><Icon size={19} />{label}</Link>)}
+          </nav>
+          <div className="panel workshop-tools">
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Settings size={18} /><b>Operatività</b></div>
             <p style={{ margin: "10px 0 6px", fontSize: 14 }}>Gestisci disponibilità e chiusure dal calendario.</p>
             <Link href="/officina/calendario" style={{ fontSize: 14 }}>Apri calendario</Link>
           </div>
+          <Link href="/admin" className="button secondary workshop-admin-switch"><ShieldCheck size={18} /> Amministrazione</Link>
         </aside>
 
-        <main className="main" style={{ paddingBottom: 96 }}>
+        <main className="main workshop-main" style={{ paddingBottom: 96 }}>
+          <div className="workshop-mobile-toolbar">
+            <Link href="/admin" className="button secondary"><ShieldCheck size={17} /> Admin</Link>
+            <button type="button" className="button" onClick={() => void load()}>Aggiorna</button>
+          </div>
           <div className="eyebrow">Panoramica officina</div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div className="workshop-hero-row">
             <div>
               <h1 style={{ fontSize: "clamp(34px, 5vw, 52px)", marginBottom: 8 }}>Le tue prenotazioni</h1>
               <p className="lead" style={{ marginBottom: 0 }}>Lavora sulle pratiche assegnate e avvia la verifica direttamente da qui.</p>
             </div>
-            <button type="button" className="button" onClick={() => void load()}>Aggiorna</button>
+            <button type="button" className="button workshop-desktop-refresh" onClick={() => void load()}>Aggiorna</button>
           </div>
 
+          {message && <div className="notice error-notice" style={{ marginTop: 18 }}>{message}</div>}
+
           <section style={{ padding: "28px 0 8px" }}>
-            <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+            <div className="cards workshop-stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
               {stats.map(({ label, value, icon: Icon }) => <div className="metric" key={label} style={{ minHeight: 132 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Icon size={20} />{label}</div><strong style={{ marginTop: 12, fontSize: 34 }}>{value}</strong></div>)}
             </div>
           </section>
 
           <section style={{ padding: "28px 0" }}>
-            <div className="panel">
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+            <div className="panel workshop-bookings-panel">
+              <div className="workshop-panel-head">
                 <div><div className="eyebrow">Pratiche</div><h3 style={{ marginBottom: 4 }}>Elenco vetture</h3><p style={{ marginBottom: 0, opacity: .76 }}>Solo pratiche assegnate a questa officina.</p></div>
                 <span className="badge">{data?.bookings.length ?? 0} pratiche</span>
               </div>
-              {message && <p className="notice">{message}</p>}
-              <div style={{ display: "grid", gap: 12 }}>
-                {(data?.bookings ?? []).length === 0 && <div className="notice">Nessuna pratica assegnata.</div>}
+              <div className="workshop-bookings-list">
+                {(data?.bookings ?? []).length === 0 && <div className="empty-state">Nessuna pratica assegnata.</div>}
                 {(data?.bookings ?? []).map((booking) => {
                   const vehicle = [booking.vehicle_make, booking.vehicle_model, booking.vehicle_year].filter(Boolean).join(" ");
                   const payout = booking.payout ? `€${(booking.payout.amount_cents / 100).toFixed(2).replace('.', ',')}` : "—";
-                  return <div key={booking.id} style={{ border: "1px solid rgba(127,127,127,.18)", borderRadius: 18, padding: 16, display: "grid", gap: 12, gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center" }}>
-                    <div>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}><strong>{vehicle || "Veicolo"}</strong><span className="badge">{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>{booking.urgency && <span className="badge">Urgenza</span>}</div>
-                      <div style={{ fontSize: 14, opacity: .72 }}>{booking.plate} · {booking.requested_date ?? "Data da definire"} {booking.requested_slot ?? ""}</div>
+                  return <article key={booking.id} className="workshop-booking-card">
+                    <div className="workshop-booking-main">
+                      <div className="workshop-booking-title"><strong>{vehicle || "Veicolo"}</strong><span className="badge">{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>{booking.urgency && <span className="badge">Urgenza</span>}</div>
+                      <div className="workshop-booking-meta">{booking.plate} · {booking.requested_date ?? "Data da definire"} {booking.requested_slot ?? ""}</div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <div className="workshop-booking-actions">
                       <span className="badge">{STATUS_LABELS[booking.status] ?? booking.status}</span>
                       {booking.status === "assigned" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "confirmed")}>{busyId === booking.id ? "…" : "Conferma"}</button>}
                       {booking.status === "confirmed" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "in_progress")}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
                       {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "refunded" && <Link className="button" href={`/officina/checklist?booking=${booking.id}`}>Checklist</Link>}
                       {booking.status === "completed" && <Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Rivedi</Link>}
-                      <span style={{ fontWeight: 700 }}>{payout}</span>
+                      <span className="workshop-payout">{payout}</span>
                     </div>
-                  </div>;
+                  </article>;
                 })}
               </div>
             </div>
