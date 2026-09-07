@@ -118,13 +118,13 @@ export default function Officina() {
             <p style={{ margin: "10px 0 6px", fontSize: 14 }}>Gestisci disponibilità e chiusure dal calendario.</p>
             <Link href="/officina/calendario" style={{ fontSize: 14 }}>Apri calendario</Link>
           </div>
-          {data?.isSuperAdmin !== false && <Link href="/admin" className="button secondary workshop-admin-switch"><ShieldCheck size={18}/> Amministrazione</Link>}
+          {data?.isSuperAdmin === true && <Link href="/admin" className="button secondary workshop-admin-switch"><ShieldCheck size={18}/> Amministrazione</Link>}
         </aside>
 
         <main className="main workshop-main" style={{ paddingBottom: 96 }}>
           <div className="workshop-mobile-toolbar">
-            <Link href="/admin" className="button secondary"><ShieldCheck size={17}/> Admin</Link>
-            <button type="button" className="button workshop-desktop-refresh" onClick={() => void load()}>Aggiorna</button>
+            {data?.isSuperAdmin === true && <Link href="/admin" className="button secondary"><ShieldCheck size={17}/> Admin</Link>}
+            <button type="button" className="button workshop-mobile-refresh" onClick={() => void load()}>Aggiorna</button>
           </div>
           <div className="eyebrow">Panoramica officina</div>
           <div className="workshop-hero-row">
@@ -174,7 +174,7 @@ export default function Officina() {
           </section>
 
           <section style={{ padding: "0 0 28px" }}>
-            <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+            <div className="cards workshop-quick-links" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
               <Link className="card" href="/officina/calendario"><Clock3 size={22} /><h3 style={{ marginTop: 10 }}>Disponibilità</h3><p>Imposta gli slot prenotabili, capacità giornaliera e chiusure.</p></Link>
               <Link className="card" href="/officina/guadagni"><Euro size={22} /><h3 style={{ marginTop: 10 }}>Guadagni</h3><p>Vedi pratiche concluse e compensi ancora da liquidare.</p></Link>
             </div>
