@@ -23,6 +23,7 @@ type Booking = {
 type DashboardPayload = {
   workshop: { id: string; name: string; city: string | null; address: string | null; postal_code: string | null };
   bookings: Booking[];
+  isSuperAdmin?: boolean;
 };
 
 const nav = [
@@ -117,13 +118,13 @@ export default function Officina() {
             <p style={{ margin: "10px 0 6px", fontSize: 14 }}>Gestisci disponibilità e chiusure dal calendario.</p>
             <Link href="/officina/calendario" style={{ fontSize: 14 }}>Apri calendario</Link>
           </div>
-          <Link href="/admin" className="button secondary workshop-admin-switch"><ShieldCheck size={18}/> Amministrazione</Link>
+          {data?.isSuperAdmin !== false && <Link href="/admin" className="button secondary workshop-admin-switch"><ShieldCheck size={18}/> Amministrazione</Link>}
         </aside>
 
         <main className="main workshop-main" style={{ paddingBottom: 96 }}>
           <div className="workshop-mobile-toolbar">
             <Link href="/admin" className="button secondary"><ShieldCheck size={17}/> Admin</Link>
-            <button type="button" className="button" onClick={() => void load()}>Aggiorna</button>
+            <button type="button" className="button workshop-desktop-refresh" onClick={() => void load()}>Aggiorna</button>
           </div>
           <div className="eyebrow">Panoramica officina</div>
           <div className="workshop-hero-row">
