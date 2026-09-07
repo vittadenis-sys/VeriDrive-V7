@@ -1,13 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 
-export async function requireAdmin() {
+export async function getCurrentAdminRole() {
   const supabase = await createClient();
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser();
 
-  if (authError || !user) throw new Error("Unauthorized");
+  if (authError || !user) return null;
 
   const { data: admin, error: adminError } = await supabase
     .from("admins")
@@ -15,15 +15,14 @@ export async function requireAdmin() {
     .eq("auth_id", user.id)
     .maybeSingle();
 
-  if (adminError) {
-    throw new Error(`Admin lookup failed: ${adminError.message}`);
-  }
+  if (adminError || !admin) return null;
+  return { user, role: admin.role as "admin" | "super_admin" };
+}
 
-  if (!admin || !["admin", "super_admin"].includes(admin.role)) {
-    throw new Error("Unauthorized");
-  }
-
-  return user;
+export async function requireAdmin() {
+  const current = await getCurrentAdminRole();
+  if (!current) throw new Error("Unauthorized");
+  return current.user;
 }
 
 export async function requireWorkshopOwner() {
