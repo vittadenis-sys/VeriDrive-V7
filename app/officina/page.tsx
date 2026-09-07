@@ -168,7 +168,7 @@ export default function Officina() {
               </div>
               {message && <p className="notice workshop-message">{message}</p>}
               <div className="workshop-bookings">
-                {(data?.bookings ?? []).length === 0 && <div className="notice">Nessuna pratica assegnata.</div>}
+                {(data?.bookings ?? []).length === 0 && !message && <div className="notice">Nessuna pratica assegnata.</div>}
                 {(data?.bookings ?? []).map((booking) => {
                   const vehicle = [booking.vehicle_make, booking.vehicle_model, booking.vehicle_year].filter(Boolean).join(" ");
                   const payout = booking.payout ? `€${(booking.payout.amount_cents / 100).toFixed(2).replace('.', ',')}` : "—";
