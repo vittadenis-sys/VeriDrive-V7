@@ -28,13 +28,26 @@ export async function requireAdmin() {
 
 export async function requireWorkshopOwner() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) throw new Error("Unauthorized");
+
+  const { data: admin } = await supabase
+    .from("admins")
+    .select("auth_id, role")
+    .eq("auth_id", user.id)
+    .maybeSingle();
+
+  if (admin?.role === "super_admin") return user;
+
   const { data: workshop, error } = await supabase
     .from("workshops")
     .select("id")
     .eq("owner_auth_id", user.id)
     .single();
+
   if (error || !workshop) throw new Error("Workshop owner required");
   return user;
 }
