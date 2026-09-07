@@ -5,9 +5,9 @@ export const metadata: Metadata = {
   title: "VeriDrive | La verifica che vale",
   description: "Verifiche auto certificate, trasparenti e semplici.",
   icons: {
-    icon: "/veridrive-logo.svg",
-    shortcut: "/veridrive-logo.svg",
-    apple: "/veridrive-logo.svg",
+    icon: "/veridrive-logo.png",
+    shortcut: "/veridrive-logo.png",
+    apple: "/veridrive-logo.png",
   },
 };
 
