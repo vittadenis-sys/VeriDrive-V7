@@ -6,7 +6,7 @@ import { Menu, X, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 const links = [
-  ["/cliente", "Area Cliente"],
+  ["/dashboard", "Area Cliente"],
   ["/commercianti", "Commercianti"],
   ["/officina", "Officine"],
 ] as const;
