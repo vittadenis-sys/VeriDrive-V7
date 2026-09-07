@@ -85,6 +85,20 @@ input,select,textarea { padding:12px; border:1px solid #cbd7e4; border-radius:9p
 .workshop-payout { font-weight:800; white-space:nowrap; }
 .empty-state { padding:18px; border:1px dashed #cbd7e4; border-radius:14px; color:var(--muted); background:#fbfdff; }
 
+/* Home service cards */
+.journeys { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; padding:28px 0; }
+.journey { min-width:0; }
+.journey-heading { display:flex; align-items:flex-start; gap:14px; min-width:0; }
+.journey-heading > div:last-child { min-width:0; }
+.icon { flex:none; width:46px; height:46px; display:flex; align-items:center; justify-content:center; border-radius:14px; background:#eef5ff; color:#0c5ec9; }
+.service-list { display:grid; gap:0; margin-top:20px; }
+.service-item { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px; align-items:center; padding:18px 0; border-top:1px solid var(--line); min-width:0; }
+.service-copy { min-width:0; display:grid; gap:5px; }
+.service-copy strong { display:block; font-size:19px; line-height:1.25; overflow-wrap:anywhere; }
+.service-copy span:not(.recommended) { display:block; color:var(--muted); line-height:1.45; overflow-wrap:anywhere; }
+.service-price { display:flex; align-items:center; gap:5px; white-space:nowrap; font-weight:800; }
+.recommended { display:inline-flex; width:max-content; color:#0c5ec9; font-weight:800; font-size:11px; letter-spacing:.7px; }
+
 @media (max-width: 900px) {
   .hero-grid,.journeys { grid-template-columns:1fr; }
   .admin-metrics { grid-template-columns:1fr 1fr; }
@@ -131,6 +145,16 @@ input,select,textarea { padding:12px; border:1px solid #cbd7e4; border-radius:9p
   .workshop-booking-actions .button { flex:1 1 130px; }
   .workshop-payout { margin-left:auto; }
   .card { padding:20px; }
+  .journeys { grid-template-columns:1fr; gap:14px; padding:20px 0; }
+  .journey { padding:20px; overflow:hidden; }
+  .journey-heading { gap:12px; }
+  .journey-heading h3 { font-size:25px; line-height:1.15; margin:10px 0 0; }
+  .service-list { margin-top:16px; }
+  .service-item { grid-template-columns:minmax(0,1fr) auto; gap:10px; padding:16px 0; align-items:start; }
+  .service-copy { gap:4px; }
+  .service-copy strong { font-size:18px; line-height:1.25; }
+  .service-copy span:not(.recommended) { font-size:16px; line-height:1.42; }
+  .service-price { padding-top:2px; font-size:16px; }
   .workshop-dashboard > .main > section:last-child .cards { grid-template-columns:1fr !important; width:100%; max-width:100%; }
   .workshop-dashboard > .main > section:last-child .card { width:100%; max-width:100%; min-width:0; }
   h1 { overflow-wrap:anywhere; }
