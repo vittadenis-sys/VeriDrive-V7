@@ -55,7 +55,6 @@ export default function Officina() {
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   async function load() {
     setMessage("");
@@ -64,10 +63,8 @@ export default function Officina() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Impossibile caricare la dashboard.");
       setData(payload);
-      setIsSuperAdmin(payload.isSuperAdmin === true);
     } catch (error) {
       setData(null);
-      setIsSuperAdmin(false);
       setMessage(error instanceof Error ? error.message : "Impossibile caricare la dashboard.");
     }
   }
@@ -137,7 +134,7 @@ export default function Officina() {
               <p className="lead">Lavora sulle pratiche assegnate e avvia la verifica direttamente da qui.</p>
             </div>
             <div className="workshop-head-actions">
-              {isSuperAdmin && <Link className="button secondary workshop-admin-shortcut" href="/admin"><Shield size={18} /> Admin</Link>}
+              {data?.isSuperAdmin && <Link className="button secondary workshop-admin-shortcut" href="/admin"><Shield size={18} /> Admin</Link>}
               <button type="button" className="button" onClick={() => void load()}>Aggiorna</button>
             </div>
           </div>
