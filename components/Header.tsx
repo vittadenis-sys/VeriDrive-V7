@@ -65,7 +65,9 @@ export function Header() {
             </div>
           </div>
 
-          {links.map(([href, label]) => <Link key={href} href={href} onClick={closeMenu}>{label}</Link>)}
+          <Link href="/dashboard" onClick={closeMenu}>Area Cliente</Link>
+          <Link href="/commercianti" onClick={closeMenu}>Commercianti</Link>
+          <Link href="/officina" onClick={closeMenu}>Officine</Link>
           <Link className="button" href="/prenota" onClick={closeMenu}>Prenota</Link>
           <Link className="button secondary mobile-admin-shortcut" href="/admin" onClick={closeMenu}><ShieldCheck size={18}/> Admin</Link>
         </div>
