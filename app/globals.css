@@ -115,16 +115,23 @@ input,select,textarea { padding:12px; border:1px solid #cbd7e4; border-radius:9p
   .admin-search { grid-template-columns:1fr; }
   .admin-list-card { grid-template-columns:1fr; }
   .admin-list-card .metric { width:100%; }
-  .dashboard { display:block; }
+  .dashboard { display:block; width:100%; min-width:0; }
+  .workshop-dashboard { width:100%; max-width:100%; overflow-x:hidden; }
   .side { position:relative; display:none; }
-  .main { padding:20px 16px 48px; width:100%; overflow:hidden; }
+  .main,
+  .workshop-main { padding:20px 16px 48px; width:100%; max-width:100%; min-width:0; margin:0; overflow-x:hidden; }
   .workshop-mobile-toolbar { display:flex; justify-content:space-between; gap:10px; margin-bottom:18px; }
+  .workshop-mobile-toolbar .button { flex:1 1 0; min-width:0; }
   .workshop-desktop-refresh { display:none; }
-  .workshop-stats { grid-template-columns:1fr !important; }
+  .workshop-stats { grid-template-columns:1fr !important; width:100%; max-width:100%; }
+  .workshop-stats .metric { width:100%; min-width:0; }
+  .workshop-bookings-panel { width:100%; max-width:100%; overflow:hidden; }
   .workshop-booking-card { grid-template-columns:1fr; padding:14px; }
   .workshop-booking-actions { justify-content:flex-start; }
   .workshop-booking-actions .button { flex:1 1 130px; }
   .workshop-payout { margin-left:auto; }
   .card { padding:20px; }
+  .workshop-dashboard > .main > section:last-child .cards { grid-template-columns:1fr !important; width:100%; max-width:100%; }
+  .workshop-dashboard > .main > section:last-child .card { width:100%; max-width:100%; min-width:0; }
   h1 { overflow-wrap:anywhere; }
 }
