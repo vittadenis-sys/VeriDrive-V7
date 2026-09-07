@@ -1,16 +1,24 @@
 import { NextResponse } from "next/server";
-import { requireWorkshopOwner } from "@/lib/authorization";
+import { getCurrentAdminRole, requireWorkshopOwner } from "@/lib/authorization";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export async function GET() {
   try {
-    const user = await requireWorkshopOwner();
+    const currentAdmin = await getCurrentAdminRole();
+    const isSuperAdmin = currentAdmin?.role === "super_admin";
+    const user = isSuperAdmin ? currentAdmin.user : await requireWorkshopOwner();
     const db = createServiceClient();
-    const { data: workshop, error: workshopError } = await db
+
+    let workshopQuery = db
       .from("workshops")
       .select("id,name,city,address,postal_code")
-      .eq("owner_auth_id", user.id)
-      .single();
+      .limit(1);
+
+    workshopQuery = isSuperAdmin
+      ? workshopQuery.order("display_name", { ascending: true })
+      : workshopQuery.eq("owner_auth_id", user.id);
+
+    const { data: workshop, error: workshopError } = await workshopQuery.single();
     if (workshopError || !workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
 
     const { data: bookings, error } = await db
@@ -31,7 +39,7 @@ export async function GET() {
       payout: payoutByBooking.get(booking.id) ?? null,
     }));
 
-    return NextResponse.json({ workshop, bookings: enriched });
+    return NextResponse.json({ workshop, bookings: enriched, isSuperAdmin });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Non autorizzato";
     return NextResponse.json({ error: message }, { status: 401 });
