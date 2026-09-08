@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ClipboardList, Euro, Home, UserRound, Settings, Clock3 } from "lucide-react";
+import { CalendarDays, ClipboardList, Euro, Home, UserRound, Clock3, Shield } from "lucide-react";
 import { Header } from "@/components/Header";
 
 type Booking = {
@@ -54,16 +54,20 @@ export default function Officina() {
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   async function load() {
     setMessage("");
     try {
       const response = await fetch("/api/workshop/dashboard", { cache: "no-store" });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Impossibile caricare la dashboard.");
+      if (!response.ok) throw new Error(payload.error || "Impossibile caricare i dati dell'officina.");
       setData(payload);
+      setIsSuperAdmin(payload.isSuperAdmin === true);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Impossibile caricare la dashboard.");
+      setData(null);
+      setIsSuperAdmin(false);
+      setMessage(error instanceof Error ? error.message : "Impossibile caricare i dati dell'officina.");
     }
   }
 
@@ -71,18 +75,17 @@ export default function Officina() {
 
   const stats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const todayBookings = data?.bookings.filter((booking) => booking.requested_date === today).length ?? 0;
-    const open = data?.bookings.filter((booking) => ["assigned", "confirmed", "in_progress"].includes(booking.status)).length ?? 0;
-    const due = (data?.bookings ?? []).filter((booking) => booking.payout?.status === "pending").reduce((sum, booking) => sum + (booking.payout?.amount_cents ?? 0), 0);
+    const bookings = data?.bookings ?? [];
     return [
-      { label: "Prenotazioni oggi", value: String(todayBookings), icon: ClipboardList },
-      { label: "Da completare", value: String(open), icon: CalendarDays },
-      { label: "Da liquidare", value: `€${(due / 100).toFixed(2).replace('.', ',')}`, icon: Euro },
+      { label: "Prenotazioni oggi", value: String(bookings.filter((booking) => booking.requested_date === today).length), icon: ClipboardList },
+      { label: "Da completare", value: String(bookings.filter((booking) => ["assigned", "confirmed", "in_progress"].includes(booking.status)).length), icon: CalendarDays },
+      { label: "Da liquidare", value: `€${(bookings.filter((booking) => booking.payout?.status === "pending").reduce((sum, booking) => sum + (booking.payout?.amount_cents ?? 0), 0) / 100).toFixed(2).replace(".", ",")}`, icon: Euro },
     ];
   }, [data]);
 
   async function changeStatus(id: string, toStatus: "confirmed" | "in_progress") {
-    setBusyId(id); setMessage("");
+    setBusyId(id);
+    setMessage("");
     try {
       const response = await fetch("/api/workshop/status", {
         method: "PATCH",
@@ -102,78 +105,100 @@ export default function Officina() {
   return (
     <>
       <Header />
-      <div className="dashboard">
-        <aside className="side" style={{ paddingBottom: 96 }}>
-          <div style={{ marginBottom: 24 }}>
+      <main className="page workshop-page">
+        <div className="shell">
+          <section className="workshop-mobile-title">
             <div className="eyebrow">Partner VeriDrive</div>
-            <h2 style={{ marginBottom: 4 }}>{data?.workshop ? `VeriDrive ${data.workshop.city ?? ""} — ${data.workshop.name}` : "Officina VeriDrive"}</h2>
-            <p style={{ margin: 0, opacity: .7, fontSize: 14 }}>Dashboard operativa</p>
-          </div>
-          <div style={{ display: "grid", gap: 8 }}>
-            {nav.map(([label, href, Icon]) => <Link key={href} href={href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}><Icon size={19} />{label}</Link>)}
-          </div>
-          <div className="panel" style={{ marginTop: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Settings size={18} /><b>Operatività</b></div>
-            <p style={{ margin: "10px 0 6px", fontSize: 14 }}>Gestisci disponibilità e chiusure dal calendario.</p>
-            <Link href="/officina/calendario" style={{ fontSize: 14 }}>Apri calendario</Link>
-          </div>
-        </aside>
+            <h1>{data?.workshop?.name ? `Officina ${data.workshop.name}` : "Officina VeriDrive"}</h1>
+            <p>Dashboard operativa</p>
+          </section>
 
-        <main className="main" style={{ paddingBottom: 96 }}>
-          <div className="eyebrow">Panoramica officina</div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <section className="workshop-toolbar">
             <div>
-              <h1 style={{ fontSize: "clamp(34px, 5vw, 52px)", marginBottom: 8 }}>Le tue prenotazioni</h1>
-              <p className="lead" style={{ marginBottom: 0 }}>Lavora sulle pratiche assegnate e avvia la verifica direttamente da qui.</p>
+              <div className="eyebrow">Panoramica officina</div>
+              <h2>Le tue prenotazioni</h2>
+              <p className="lead">Lavora sulle pratiche assegnate e avvia la verifica direttamente da qui.</p>
             </div>
-            <button type="button" className="button" onClick={() => void load()}>Aggiorna</button>
-          </div>
-
-          <section style={{ padding: "28px 0 8px" }}>
-            <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-              {stats.map(({ label, value, icon: Icon }) => <div className="metric" key={label} style={{ minHeight: 132 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><Icon size={20} />{label}</div><strong style={{ marginTop: 12, fontSize: 34 }}>{value}</strong></div>)}
+            <div className="workshop-head-actions">
+              {isSuperAdmin && <Link className="button secondary" href="/admin"><Shield size={18} /> Admin</Link>}
+              <button className="button" type="button" onClick={() => void load()}>Aggiorna</button>
             </div>
           </section>
 
-          <section style={{ padding: "28px 0" }}>
-            <div className="panel">
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-                <div><div className="eyebrow">Pratiche</div><h3 style={{ marginBottom: 4 }}>Elenco vetture</h3><p style={{ marginBottom: 0, opacity: .76 }}>Solo pratiche assegnate a questa officina.</p></div>
+          <nav className="workshop-nav-bar" aria-label="Navigazione officina">
+            {nav.map(([label, href, Icon]) => (
+              <Link key={`${label}-${href}`} href={href}>
+                <Icon size={20} />
+                <span>{label}</span>
+              </Link>
+            ))}
+          </nav>
+
+          <section className="workshop-stats-section">
+            <div className="workshop-stats-grid">
+              {stats.map(({ label, value, icon: Icon }) => (
+                <article className="metric workshop-stat-card" key={label}>
+                  <div className="workshop-stat-label"><Icon size={21} /><span>{label}</span></div>
+                  <strong>{value}</strong>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="workshop-practices-section">
+            <div className="panel workshop-practices-panel">
+              <div className="workshop-section-head">
+                <div>
+                  <div className="eyebrow">Pratiche</div>
+                  <h2>Elenco vetture</h2>
+                  <p>Solo pratiche assegnate a questa officina.</p>
+                </div>
                 <span className="badge">{data?.bookings.length ?? 0} pratiche</span>
               </div>
-              {message && <p className="notice">{message}</p>}
-              <div style={{ display: "grid", gap: 12 }}>
-                {(data?.bookings ?? []).length === 0 && <div className="notice">Nessuna pratica assegnata.</div>}
+
+              {message && <p className="notice workshop-message">Impossibile caricare i dati dell'officina.</p>}
+              <div className="workshop-bookings">
+                {(data?.bookings ?? []).length === 0 && !message && <div className="notice">Nessuna pratica assegnata.</div>}
                 {(data?.bookings ?? []).map((booking) => {
                   const vehicle = [booking.vehicle_make, booking.vehicle_model, booking.vehicle_year].filter(Boolean).join(" ");
-                  const payout = booking.payout ? `€${(booking.payout.amount_cents / 100).toFixed(2).replace('.', ',')}` : "—";
-                  return <div key={booking.id} style={{ border: "1px solid rgba(127,127,127,.18)", borderRadius: 18, padding: 16, display: "grid", gap: 12, gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center" }}>
-                    <div>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}><strong>{vehicle || "Veicolo"}</strong><span className="badge">{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>{booking.urgency && <span className="badge">Urgenza</span>}</div>
-                      <div style={{ fontSize: 14, opacity: .72 }}>{booking.plate} · {booking.requested_date ?? "Data da definire"} {booking.requested_slot ?? ""}</div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                      <span className="badge">{STATUS_LABELS[booking.status] ?? booking.status}</span>
-                      {booking.status === "assigned" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "confirmed")}>{busyId === booking.id ? "…" : "Conferma"}</button>}
-                      {booking.status === "confirmed" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "in_progress")}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
-                      {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "refunded" && <Link className="button" href={`/officina/checklist?booking=${booking.id}`}>Checklist</Link>}
-                      {booking.status === "completed" && <Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Rivedi</Link>}
-                      <span style={{ fontWeight: 700 }}>{payout}</span>
-                    </div>
-                  </div>;
+                  const payout = booking.payout ? `€${(booking.payout.amount_cents / 100).toFixed(2).replace(".", ",")}` : "—";
+                  return (
+                    <article className="workshop-booking" key={booking.id}>
+                      <div className="workshop-booking-main">
+                        <div className="workshop-booking-title">
+                          <strong>{vehicle || "Veicolo"}</strong>
+                          <span className="badge">{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>
+                          {booking.urgency && <span className="badge">Urgenza</span>}
+                        </div>
+                        <div className="workshop-booking-meta">{booking.plate} · {booking.requested_date ?? "Data da definire"} {booking.requested_slot ?? ""}</div>
+                      </div>
+                      <div className="workshop-booking-actions">
+                        <span className="badge">{STATUS_LABELS[booking.status] ?? booking.status}</span>
+                        {booking.status === "assigned" && <button className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "confirmed")}>{busyId === booking.id ? "…" : "Conferma"}</button>}
+                        {booking.status === "confirmed" && <button className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "in_progress")}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
+                        {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "refunded" && <Link className="button" href={`/officina/checklist?booking=${booking.id}`}>Checklist</Link>}
+                        {booking.status === "completed" && <Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Rivedi</Link>}
+                        <span className="workshop-payout">{payout}</span>
+                      </div>
+                    </article>
+                  );
                 })}
               </div>
             </div>
           </section>
 
-          <section style={{ padding: "0 0 28px" }}>
-            <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-              <Link className="card" href="/officina/calendario"><Clock3 size={22} /><h3 style={{ marginTop: 10 }}>Disponibilità</h3><p>Imposta gli slot prenotabili, capacità giornaliera e chiusure.</p></Link>
-              <Link className="card" href="/officina/guadagni"><Euro size={22} /><h3 style={{ marginTop: 10 }}>Guadagni</h3><p>Vedi pratiche concluse e compensi ancora da liquidare.</p></Link>
-            </div>
+          <section className="workshop-bottom">
+            <Link className="card workshop-bottom-card" href="/officina/calendario">
+              <Clock3 size={22} />
+              <div><h3>Disponibilità</h3><p>Imposta gli slot prenotabili, capacità giornaliera e chiusure.</p></div>
+            </Link>
+            <Link className="card workshop-bottom-card" href="/officina/guadagni">
+              <Euro size={22} />
+              <div><h3>Guadagni</h3><p>Vedi pratiche concluse e compensi ancora da liquidare.</p></div>
+            </Link>
           </section>
-        </main>
-      </div>
+        </div>
+      </main>
     </>
   );
 }
