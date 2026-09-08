@@ -32,13 +32,24 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const protectedArea =
-    path.startsWith("/dashboard") ||
-    path.startsWith("/officina") ||
-    path.startsWith("/admin");
+  const isAdminArea = path.startsWith("/admin");
+  const isCustomerArea = path.startsWith("/dashboard");
+  const isWorkshopArea = path.startsWith("/officina");
 
-  if (!user && protectedArea && path !== "/admin/login") {
+  if (!user && isAdminArea && path !== "/admin/login") {
     const login = new URL("/admin/login", request.url);
+    login.searchParams.set("next", path);
+    return NextResponse.redirect(login);
+  }
+
+  if (!user && isCustomerArea) {
+    const login = new URL("/login", request.url);
+    login.searchParams.set("next", path);
+    return NextResponse.redirect(login);
+  }
+
+  if (!user && isWorkshopArea && path !== "/officina/login") {
+    const login = new URL("/login", request.url);
     login.searchParams.set("next", path);
     return NextResponse.redirect(login);
   }
