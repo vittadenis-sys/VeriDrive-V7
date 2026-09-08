@@ -16,7 +16,11 @@ export async function POST() {
       .maybeSingle();
 
     if (lookupError) {
-      return NextResponse.json({ error: "Impossibile verificare il profilo cliente." }, { status: 500 });
+      console.error("CUSTOMER_LOOKUP_ERROR", lookupError);
+      return NextResponse.json(
+        { error: lookupError instanceof Error ? lookupError.message : "Impossibile verificare il profilo cliente." },
+        { status: 500 }
+      );
     }
 
     if (existing) return NextResponse.json({ ok: true, customerId: existing.id });
@@ -29,11 +33,19 @@ export async function POST() {
       .single();
 
     if (error || !customer) {
-      return NextResponse.json({ error: "Impossibile creare il profilo cliente." }, { status: 500 });
+      console.error("CUSTOMER_INSERT_ERROR", error);
+      return NextResponse.json(
+        { error: error?.message ?? "Impossibile creare il profilo cliente." },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ ok: true, customerId: customer.id });
-  } catch {
-    return NextResponse.json({ error: "Impossibile inizializzare il profilo cliente." }, { status: 500 });
+  } catch (err) {
+    console.error("BOOTSTRAP_ERROR", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Bootstrap failed" },
+      { status: 500 }
+    );
   }
 }
