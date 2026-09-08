@@ -14,8 +14,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
     setBusy(true);
     setMessage("");
-    const email = String(form.get("email"));
-    const password = String(form.get("password"));
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
 
     const result = mode === "login"
       ? await supabase.auth.signInWithPassword({ email, password })
@@ -35,38 +35,64 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       return;
     }
 
-    if (mode === "login") {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setMessage("Accesso completato ma sessione non disponibile.");
-        return;
-      }
-
-      // Admin/super-admin keep the admin area; all other users start as customers.
-      const { data: workshop } = await supabase
-        .from("workshops")
-        .select("id")
-        .eq("owner_auth_id", user.id)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      const { data: admin } = await supabase
-        .from("admins")
-        .select("role")
-        .eq("auth_id", user.id)
-        .maybeSingle();
-
-      if (admin?.role === "super_admin" || admin?.role === "admin") {
-        location.assign("/admin");
-      } else if (workshop) {
-        location.assign("/officina");
-      } else {
-        location.assign("/dashboard");
-      }
+    if (mode === "register") {
+      setMessage("Controlla la tua email per confermare l’account. Il nuovo account parte come Cliente; Commerciante e Officina richiedono approvazione Admin.");
       return;
     }
 
-    setMessage("Controlla la tua email per confermare l’account. Il nuovo account parte come Cliente; l’accesso Officina viene attivato solo dopo approvazione.");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setMessage("Accesso completato ma sessione non disponibile.");
+      return;
+    }
+
+    // Existing users may be authenticated even when their customer profile is missing.
+    // Create/repair the customer profile before routing to the customer dashboard.
+    let customer = null;
+    const customerLookup = await supabase
+      .from("customers")
+      .select("id,full_name,phone,demo_access,autogerma_free_booking_bonus")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+
+    customer = customerLookup.data;
+
+    if (!customer) {
+      const fullName = String(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "Cliente").trim();
+      const { data: createdCustomer, error: customerCreateError } = await supabase
+        .from("customers")
+        .insert({ auth_id: user.id, full_name: fullName || "Cliente" })
+        .select("id,full_name,phone,demo_access,autogerma_free_booking_bonus")
+        .single();
+
+      if (customerCreateError || !createdCustomer) {
+        setMessage("Accesso riuscito, ma non riesco a creare il profilo Cliente. Riprova tra poco.");
+        return;
+      }
+
+      customer = createdCustomer;
+    }
+
+    const { data: workshop } = await supabase
+      .from("workshops")
+      .select("id")
+      .eq("owner_auth_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    const { data: admin } = await supabase
+      .from("admins")
+      .select("role")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+
+    if (admin?.role === "super_admin" || admin?.role === "admin") {
+      location.assign("/admin");
+    } else if (workshop) {
+      location.assign("/officina");
+    } else {
+      location.assign("/dashboard");
+    }
   }
 
   return (
