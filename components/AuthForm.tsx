@@ -46,31 +46,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       return;
     }
 
-    // Existing users may be authenticated even when their customer profile is missing.
-    // Create/repair the customer profile before routing to the customer dashboard.
-    let customer = null;
-    const customerLookup = await supabase
-      .from("customers")
-      .select("id,full_name,phone,demo_access,autogerma_free_booking_bonus")
-      .eq("auth_id", user.id)
-      .maybeSingle();
-
-    customer = customerLookup.data;
-
-    if (!customer) {
-      const fullName = String(user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "Cliente").trim();
-      const { data: createdCustomer, error: customerCreateError } = await supabase
-        .from("customers")
-        .insert({ auth_id: user.id, full_name: fullName || "Cliente" })
-        .select("id,full_name,phone,demo_access,autogerma_free_booking_bonus")
-        .single();
-
-      if (customerCreateError || !createdCustomer) {
-        setMessage("Accesso riuscito, ma non riesco a creare il profilo Cliente. Riprova tra poco.");
-        return;
-      }
-
-      customer = createdCustomer;
+    // Repair legacy accounts that authenticated successfully but never received a customer row.
+    const bootstrap = await fetch("/api/customer/bootstrap", { method: "POST" });
+    if (!bootstrap.ok) {
+      setMessage("Accesso riuscito, ma non riesco a creare il profilo Cliente. Riprova tra poco.");
+      return;
     }
 
     const { data: workshop } = await supabase
