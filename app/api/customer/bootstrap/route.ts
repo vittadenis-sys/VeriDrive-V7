@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-export async function POST() {
+async function runBootstrap() {
   let step = "start";
 
   try {
@@ -75,4 +75,12 @@ export async function POST() {
       name: err instanceof Error ? err.name : typeof err
     }, { status: 500 });
   }
+}
+
+export async function POST() {
+  return runBootstrap();
+}
+
+export async function GET() {
+  return runBootstrap();
 }
