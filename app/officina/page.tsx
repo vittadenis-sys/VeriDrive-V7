@@ -23,6 +23,7 @@ type Booking = {
 type DashboardPayload = {
   workshop: { id: string; name: string; city: string | null; address: string | null; postal_code: string | null };
   bookings: Booking[];
+  isSuperAdmin?: boolean;
 };
 
 const nav = [
@@ -54,20 +55,16 @@ export default function Officina() {
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   async function load() {
     setMessage("");
     try {
       const response = await fetch("/api/workshop/dashboard", { cache: "no-store" });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Impossibile caricare i dati dell'officina.");
+      if (!response.ok) throw new Error(payload.error || "Impossibile caricare la dashboard.");
       setData(payload);
-      setIsSuperAdmin(payload.isSuperAdmin === true);
     } catch (error) {
-      setData(null);
-      setIsSuperAdmin(false);
-      setMessage(error instanceof Error ? error.message : "Impossibile caricare i dati dell'officina.");
+      setMessage(error instanceof Error ? error.message : "Impossibile caricare la dashboard.");
     }
   }
 
@@ -107,20 +104,14 @@ export default function Officina() {
       <Header />
       <main className="page workshop-page">
         <div className="shell">
-          <section className="workshop-mobile-title">
-            <div className="eyebrow">Partner VeriDrive</div>
-            <h1>{data?.workshop?.name ? `Officina ${data.workshop.name}` : "Officina VeriDrive"}</h1>
-            <p>Dashboard operativa</p>
-          </section>
-
-          <section className="workshop-toolbar">
-            <div>
-              <div className="eyebrow">Panoramica officina</div>
-              <h2>Le tue prenotazioni</h2>
-              <p className="lead">Lavora sulle pratiche assegnate e avvia la verifica direttamente da qui.</p>
+          <section className="workshop-hero-card">
+            <div className="workshop-title-copy">
+              <div className="eyebrow">Partner VeriDrive</div>
+              <h1>{data?.workshop?.name ? `Officina ${data.workshop.name}` : "Officina VeriDrive"}</h1>
+              <p>Dashboard operativa</p>
             </div>
             <div className="workshop-head-actions">
-              {isSuperAdmin && <Link className="button secondary" href="/admin"><Shield size={18} /> Admin</Link>}
+              {data?.isSuperAdmin && <Link className="button secondary" href="/admin"><Shield size={18} /> Admin</Link>}
               <button className="button" type="button" onClick={() => void load()}>Aggiorna</button>
             </div>
           </section>
@@ -128,7 +119,7 @@ export default function Officina() {
           <nav className="workshop-nav-bar" aria-label="Navigazione officina">
             {nav.map(([label, href, Icon]) => (
               <Link key={`${label}-${href}`} href={href}>
-                <Icon size={20} />
+                <Icon size={19} />
                 <span>{label}</span>
               </Link>
             ))}
@@ -138,7 +129,7 @@ export default function Officina() {
             <div className="workshop-stats-grid">
               {stats.map(({ label, value, icon: Icon }) => (
                 <article className="metric workshop-stat-card" key={label}>
-                  <div className="workshop-stat-label"><Icon size={21} /><span>{label}</span></div>
+                  <div className="workshop-stat-label"><Icon size={20} /><span>{label}</span></div>
                   <strong>{value}</strong>
                 </article>
               ))}
@@ -155,7 +146,6 @@ export default function Officina() {
                 </div>
                 <span className="badge">{data?.bookings.length ?? 0} pratiche</span>
               </div>
-
               {message && <p className="notice workshop-message">Impossibile caricare i dati dell'officina.</p>}
               <div className="workshop-bookings">
                 {(data?.bookings ?? []).length === 0 && !message && <div className="notice">Nessuna pratica assegnata.</div>}
