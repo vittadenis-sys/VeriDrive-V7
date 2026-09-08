@@ -83,6 +83,9 @@ export async function POST() {
       name: err instanceof Error ? err.name : typeof err,
       message: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack : undefined,
+      cause: err instanceof Error ? err.cause : undefined,
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ? "configured" : "missing",
+      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? "configured" : "missing",
     });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Bootstrap failed" },
