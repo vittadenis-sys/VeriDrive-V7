@@ -48,8 +48,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  if (!user && isWorkshopArea && path !== "/officina/login") {
-    const login = new URL("/officina/login", request.url);
+  if (!user && isWorkshopArea) {
+    const login = new URL("/login", request.url);
     login.searchParams.set("next", path);
     return NextResponse.redirect(login);
   }
