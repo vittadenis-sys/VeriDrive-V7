@@ -8,7 +8,17 @@ export function createClient() {
     throw new Error("Supabase non configurato.");
   }
 
-  return createBrowserClient(url, key);
+  return createBrowserClient(url, key, {
+    cookieOptions: {
+      sameSite: "lax",
+      secure: typeof window !== "undefined" && window.location.protocol === "https:",
+    },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
 }
 
 export const supabase = typeof window !== "undefined" ? createClient() : null;
