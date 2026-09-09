@@ -1,10 +1,12 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const router = useRouter();
 
   async function submit(form: FormData) {
     if (!supabase) {
@@ -40,14 +42,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { session, user } } = await supabase.auth.getSession();
+    if (!session || !user) {
       setMessage("Accesso completato ma sessione non disponibile.");
       return;
     }
 
     // Repair legacy accounts that authenticated successfully but never received a customer row.
-    const bootstrap = await fetch("/api/customer/bootstrap", { method: "POST" });
+    const bootstrap = await fetch("/api/customer/bootstrap", { method: "POST", credentials: "include" });
     if (!bootstrap.ok) {
       setMessage("Accesso riuscito, ma non riesco a creare il profilo Cliente. Riprova tra poco.");
       return;
@@ -67,11 +69,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       .maybeSingle();
 
     if (admin?.role === "super_admin" || admin?.role === "admin") {
-      location.assign("/admin");
+      router.replace("/admin");
     } else if (workshop) {
-      location.assign("/officina");
+      router.replace("/officina");
     } else {
-      location.assign("/dashboard");
+      router.replace("/dashboard");
     }
   }
 
