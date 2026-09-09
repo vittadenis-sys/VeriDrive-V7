@@ -5,10 +5,14 @@ export function createServiceClient() {
   const { env } = getCloudflareContext();
 
   const url =
-    env.NEXT_PUBLIC_SUPABASE_URL ??
-    env.SUPABASE_URL;
+    env.NEXT_PUBLIC_SUPABASE_URL ||
+    env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL;
 
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  const key =
+    env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url) throw new Error("Missing Supabase URL");
   if (!key) throw new Error("Missing Service Role Key");
