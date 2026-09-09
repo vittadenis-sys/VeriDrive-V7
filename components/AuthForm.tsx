@@ -42,15 +42,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       return;
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const session = sessionData.session;
+    const session = result.data.session;
     const user = session?.user;
     if (!session || !user) {
       setMessage("Accesso completato ma sessione non disponibile.");
       return;
     }
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
 
     const bootstrap = await fetch("/api/customer/bootstrap", {
       method: "POST",
