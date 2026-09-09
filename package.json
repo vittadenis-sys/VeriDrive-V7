@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:cloudflare": "opennextjs-cloudflare build",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "deploy": "opennextjs-cloudflare build && npx opennextjs-cloudflare deploy --keep-vars",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "start": "next start",
@@ -21,9 +21,9 @@
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "stripe": "^17.5.0",
-    "jspdf": "^2.5.2",
-    "resend": "^4.8.0"
+    "qrcode": "^1.5.4",
+    "resend": "^4.8.0",
+    "stripe": "^17.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
