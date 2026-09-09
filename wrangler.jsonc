@@ -7,6 +7,10 @@
     "nodejs_compat"
   ],
   "keep_vars": true,
+  "vars": {
+    "NEXT_PUBLIC_SUPABASE_URL": "https://wdddcacijkpixuvxcrje.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": ""
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
