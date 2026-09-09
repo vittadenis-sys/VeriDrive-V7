@@ -2,7 +2,13 @@ import { createClient } from "@supabase/supabase-js";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export function createServiceClient() {
-  const { env } = getCloudflareContext();
+  let env: Record<string, string | undefined> = {};
+  try {
+    const context = getCloudflareContext();
+    env = (context?.env ?? {}) as Record<string, string | undefined>;
+  } catch {
+    // Local/dev fallback to process.env.
+  }
 
   const url =
     env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -18,6 +24,6 @@ export function createServiceClient() {
   if (!key) throw new Error("Missing Service Role Key");
 
   return createClient(url, key, {
-    auth: { persistSession: false },
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 }
