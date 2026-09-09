@@ -1,17 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export function createServiceClient() {
-  let env: Record<string, unknown> = {};
-  try {
-    const context = getCloudflareContext();
-    env = (context?.env ?? {}) as Record<string, unknown>;
-  } catch {
-    // Local/dev fallback.
-  }
-
   const read = (name: string) => {
-    const value = env[name] ?? process.env[name];
+    const runtimeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+    const value = runtimeEnv?.[name];
     return typeof value === "string" ? value : undefined;
   };
 
