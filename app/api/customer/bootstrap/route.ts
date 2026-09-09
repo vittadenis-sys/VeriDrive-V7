@@ -18,7 +18,7 @@ async function runBootstrap() {
     }
 
     step = "service-client";
-    const db = createServiceClient();
+    const db = await createServiceClient();
 
     step = "customer-lookup";
     const { data: existing, error: lookupError } = await db
