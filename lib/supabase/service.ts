@@ -1,9 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-export function createServiceClient() {
-  const env = (globalThis as {
-    process?: { env?: Record<string, string | undefined> };
-  }).process?.env ?? {};
+type CloudflareEnv = {
+  NEXT_PUBLIC_SUPABASE_URL?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+};
+
+export function createServiceClient(runtimeEnv?: CloudflareEnv) {
+  const env = runtimeEnv ?? (typeof process !== "undefined" ? process.env : undefined) ?? {};
 
   const url = env.NEXT_PUBLIC_SUPABASE_URL ?? env.SUPABASE_URL;
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
