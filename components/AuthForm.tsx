@@ -42,13 +42,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       return;
     }
 
-    const { data: { session, user } } = await supabase.auth.getSession();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+    const user = session?.user;
     if (!session || !user) {
       setMessage("Accesso completato ma sessione non disponibile.");
       return;
     }
 
-    // Give Supabase's browser client a chance to persist its session before the server request.
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     const bootstrap = await fetch("/api/customer/bootstrap", {
