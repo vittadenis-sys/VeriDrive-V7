@@ -13,9 +13,6 @@
     "SUPABASE_URL": "",
     "FOO_TEST": ""
   },
-  "secrets": {
-    "required": ["SUPABASE_SERVICE_ROLE_KEY"]
-  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
