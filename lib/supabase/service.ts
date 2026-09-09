@@ -1,10 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
 
-export function createServiceClient() {
+type CloudflareRuntime = {
+  env?: Record<string, string | undefined>;
+};
+
+export function createServiceClient(runtime?: CloudflareRuntime) {
+  const runtimeEnv = runtime?.env;
+  const processEnv = typeof process !== "undefined" ? process.env : undefined;
+
   const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ??
-    process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    runtimeEnv?.NEXT_PUBLIC_SUPABASE_URL ??
+    runtimeEnv?.SUPABASE_URL ??
+    processEnv?.NEXT_PUBLIC_SUPABASE_URL ??
+    processEnv?.SUPABASE_URL;
+
+  const key =
+    runtimeEnv?.SUPABASE_SERVICE_ROLE_KEY ??
+    processEnv?.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url) throw new Error("Missing Supabase URL");
   if (!key) throw new Error("Missing Service Role Key");
