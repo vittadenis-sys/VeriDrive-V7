@@ -9,7 +9,12 @@
   "keep_vars": true,
   "vars": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://wdddcacijkpixuvxcrje.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": ""
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "",
+    "SUPABASE_URL": "",
+    "FOO_TEST": ""
+  },
+  "secrets": {
+    "required": ["SUPABASE_SERVICE_ROLE_KEY"]
   },
   "assets": {
     "directory": ".open-next/assets",
