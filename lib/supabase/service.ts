@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-export async function createServiceClient() {
-  const { env } = await getCloudflareContext({ async: true });
+export function createServiceClient() {
+  const { env } = getCloudflareContext();
 
   const url =
     env.NEXT_PUBLIC_SUPABASE_URL ||
