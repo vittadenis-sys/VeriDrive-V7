@@ -56,6 +56,13 @@ async function runBootstrap() {
       .single();
 
     if (error || !customer) {
+      console.error("CUSTOMER_INSERT_ERROR", {
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        message: error?.message,
+        userId: user.id,
+      });
       return NextResponse.json({
         ok: false,
         step,
@@ -68,6 +75,12 @@ async function runBootstrap() {
 
     return NextResponse.json({ ok: true, customerId: customer.id });
   } catch (err) {
+    console.error("BOOTSTRAP_ERROR", {
+      step,
+      name: err instanceof Error ? err.name : typeof err,
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
     return NextResponse.json({
       ok: false,
       step,
