@@ -48,8 +48,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       return;
     }
 
-    // Repair legacy accounts that authenticated successfully but never received a customer row.
-    const bootstrap = await fetch("/api/customer/bootstrap", { method: "POST", credentials: "include" });
+    // Give Supabase's browser client a chance to persist its session before the server request.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const bootstrap = await fetch("/api/customer/bootstrap", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
     if (!bootstrap.ok) {
       setMessage("Accesso riuscito, ma non riesco a creare il profilo Cliente. Riprova tra poco.");
       return;
