@@ -3,7 +3,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export async function GET() {
   const { env } = getCloudflareContext();
-  const runtimeEnv = env as Record<string, unknown>;
+  const runtimeEnv = env as unknown as Record<string, unknown>;
 
   return NextResponse.json({
     ok: true,
