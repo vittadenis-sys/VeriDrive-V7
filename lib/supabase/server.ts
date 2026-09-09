@@ -1,10 +1,21 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const { env } = getCloudflareContext();
+  const runtimeEnv = env as unknown as Record<string, string | undefined>;
+
+  const url =
+    runtimeEnv.NEXT_PUBLIC_SUPABASE_URL ??
+    runtimeEnv.SUPABASE_URL ??
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.SUPABASE_URL;
+
+  const key =
+    runtimeEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!url || !key) {
     throw new Error("Supabase non configurato.");
