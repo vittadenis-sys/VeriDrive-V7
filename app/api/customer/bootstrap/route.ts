@@ -16,7 +16,7 @@ async function runBootstrap() {
 
     step = "service-client";
     const { env } = getCloudflareContext();
-    const db = createServiceClient({ env });
+    const db = createServiceClient(env);
 
     step = "customer-lookup";
     const { data: existing, error: lookupError } = await db.from("customers").select("id").eq("auth_id", user.id).maybeSingle();
