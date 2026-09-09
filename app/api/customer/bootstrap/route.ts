@@ -3,6 +3,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export async function GET() {
   const { env } = getCloudflareContext();
+  const runtimeEnv = env as Record<string, unknown>;
 
   return NextResponse.json({
     ok: true,
@@ -12,11 +13,11 @@ export async function GET() {
     },
     worker: {
       hasEnv: !!env,
-      url: !!env?.NEXT_PUBLIC_SUPABASE_URL,
-      supabaseUrl: !!env?.SUPABASE_URL,
-      service: !!env?.SUPABASE_SERVICE_ROLE_KEY,
-      publishable: !!env?.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-      envKeys: Object.keys(env ?? {}).filter((key) => /SUPABASE/i.test(key)),
+      url: !!runtimeEnv.NEXT_PUBLIC_SUPABASE_URL,
+      supabaseUrl: !!runtimeEnv.SUPABASE_URL,
+      service: !!runtimeEnv.SUPABASE_SERVICE_ROLE_KEY,
+      publishable: !!runtimeEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      envKeys: Object.keys(runtimeEnv).filter((key) => /SUPABASE/i.test(key)),
     },
   });
 }
