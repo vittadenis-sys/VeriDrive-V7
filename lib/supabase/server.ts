@@ -6,16 +6,17 @@ export async function createClient() {
   const cookieStore = await cookies();
   const { env } = getCloudflareContext();
   const runtimeEnv = env as unknown as Record<string, string | undefined>;
+  const processEnv = process.env as Record<string, string | undefined>;
 
   const url =
-    runtimeEnv.NEXT_PUBLIC_SUPABASE_URL ??
-    runtimeEnv.SUPABASE_URL ??
-    process.env.NEXT_PUBLIC_SUPABASE_URL ??
-    process.env.SUPABASE_URL;
+    runtimeEnv.NEXT_PUBLIC_SUPABASE_URL ||
+    runtimeEnv.SUPABASE_URL ||
+    processEnv.NEXT_PUBLIC_SUPABASE_URL ||
+    processEnv.SUPABASE_URL;
 
   const key =
-    runtimeEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    runtimeEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    processEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!url || !key) {
     throw new Error("Supabase non configurato.");
