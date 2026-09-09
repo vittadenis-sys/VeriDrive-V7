@@ -29,5 +29,8 @@ jobs:
       - name: Build OpenNext
         run: bunx opennextjs-cloudflare build
 
+      - name: Upload Supabase service role secret
+        run: printf '%s' "$SUPABASE_SERVICE_ROLE_KEY" | bunx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+
       - name: Deploy Worker with Wrangler
         run: bunx wrangler deploy --keep-vars
