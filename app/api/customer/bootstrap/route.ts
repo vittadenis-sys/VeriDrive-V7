@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -14,7 +15,8 @@ async function runBootstrap() {
     }
 
     step = "service-client";
-    const db = createServiceClient();
+    const { env } = getCloudflareContext();
+    const db = createServiceClient({ env });
 
     step = "customer-lookup";
     const { data: existing, error: lookupError } = await db.from("customers").select("id").eq("auth_id", user.id).maybeSingle();
