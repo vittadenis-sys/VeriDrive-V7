@@ -2,23 +2,21 @@ import { createClient } from "@supabase/supabase-js";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export function createServiceClient() {
-  let env: Record<string, string | undefined> = {};
+  let env: Record<string, unknown> = {};
   try {
     const context = getCloudflareContext();
-    env = (context?.env ?? {}) as Record<string, string | undefined>;
+    env = (context?.env ?? {}) as Record<string, unknown>;
   } catch {
-    // Local/dev fallback to process.env.
+    // Local/dev fallback.
   }
 
-  const url =
-    env.NEXT_PUBLIC_SUPABASE_URL ||
-    env.SUPABASE_URL ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    process.env.SUPABASE_URL;
+  const read = (name: string) => {
+    const value = env[name] ?? process.env[name];
+    return typeof value === "string" ? value : undefined;
+  };
 
-  const key =
-    env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = read("NEXT_PUBLIC_SUPABASE_URL") ?? read("SUPABASE_URL");
+  const key = read("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!url) throw new Error("Missing Supabase URL");
   if (!key) throw new Error("Missing Service Role Key");
