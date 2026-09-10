@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-const VERSION = "admin-route-diag-2026-09-10-v1";
+const VERSION = "admin-route-diag-2026-09-10-v2";
 
 export async function GET() {
   const base = { version: VERSION };
@@ -18,6 +18,7 @@ export async function GET() {
         userId: null,
         email: null,
         admin: null,
+        authorized: false,
         error: authError?.message ?? "No session",
       }, { status: 401, headers: { "Cache-Control": "no-store" } });
     }
@@ -39,7 +40,6 @@ export async function GET() {
       email: user.email ?? null,
       admin,
       authorized,
-      cookies: (await import("next/headers")).cookies ? undefined : undefined,
       error: adminError?.message ?? (admin ? null : "Admin record not found"),
       code: adminError?.code ?? null,
       details: adminError?.details ?? null,
