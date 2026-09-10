@@ -31,13 +31,40 @@ async function runBootstrap() {
       processEnv.NEXT_PUBLIC_SUPABASE_URL ||
       null;
 
+    const started = Date.now();
     const { data: existing, error: lookupError } = await db
       .from("customers")
       .select("id")
       .eq("auth_id", user.id)
       .maybeSingle();
+    const lookupMs = Date.now() - started;
 
     if (lookupError) {
+      let fetchProbe: Record<string, unknown> = {};
+      if (resolvedUrl) {
+        try {
+          const probe = await fetch(`${resolvedUrl.replace(/\/$/, "")}/rest/v1/`, {
+            method: "GET",
+            headers: {
+              apikey: processEnv.SUPABASE_SERVICE_ROLE_KEY ?? runtimeEnv.SUPABASE_SERVICE_ROLE_KEY ?? "",
+              Authorization: `Bearer ${processEnv.SUPABASE_SERVICE_ROLE_KEY ?? runtimeEnv.SUPABASE_SERVICE_ROLE_KEY ?? ""}`,
+            },
+          });
+          fetchProbe = {
+            ok: probe.ok,
+            status: probe.status,
+            cfErrorType: probe.headers.get("cf-error-type"),
+            cfErrorOrigin: probe.headers.get("cf-error-origin"),
+            server: probe.headers.get("server"),
+          };
+        } catch (error) {
+          fetchProbe = {
+            thrown: error instanceof Error ? error.message : String(error),
+            name: error instanceof Error ? error.name : typeof error,
+          };
+        }
+      }
+
       return NextResponse.json(
         {
           ok: false,
@@ -46,7 +73,7 @@ async function runBootstrap() {
           code: lookupError.code,
           details: lookupError.details,
           hint: lookupError.hint,
-          lookupMs: 0,
+          lookupMs,
           env: {
             worker: {
               supabaseUrl: runtimeEnv.SUPABASE_URL || runtimeEnv.NEXT_PUBLIC_SUPABASE_URL || null,
@@ -59,6 +86,7 @@ async function runBootstrap() {
             bindingNames: Object.keys(runtimeEnv).filter((name) => name.includes("SUPABASE")).sort(),
           },
           resolvedUrl,
+          fetchProbe,
           user: { id: user.id, email: user.email ?? null },
         },
         { status: 500 }
