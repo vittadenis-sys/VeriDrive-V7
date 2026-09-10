@@ -9,8 +9,6 @@
   "keep_vars": true,
   "vars": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://wdddcacijkpixuvxcrje.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "",
-    "SUPABASE_URL": "",
     "FOO_TEST": ""
   },
   "assets": {
