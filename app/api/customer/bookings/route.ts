@@ -2,12 +2,27 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
+const ROUTE_VERSION = "customer-bookings-diag-2026-09-10-v1";
+
+function json(data: Record<string, unknown>, status = 200) {
+  return NextResponse.json({ routeVersion: ROUTE_VERSION, ...data }, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+      "X-VeriDrive-Route": ROUTE_VERSION,
+    },
+  });
+}
+
 export async function GET() {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: authError?.message ?? "Accesso richiesto." }, { status: 401 });
+      return json({
+        stage: "auth",
+        error: authError?.message ?? "Accesso richiesto.",
+      }, 401);
     }
 
     const db = createServiceClient();
@@ -25,43 +40,72 @@ export async function GET() {
         message: customerError.message,
         userId: user.id,
       });
-      return NextResponse.json({
+      return json({
+        stage: "customer",
         error: customerError.message,
         code: customerError.code,
         details: customerError.details,
         hint: customerError.hint,
-      }, { status: 500 });
+      }, 500);
     }
 
     if (!customer) {
-      return NextResponse.json({ error: "Profilo cliente non disponibile." }, { status: 403 });
+      return json({ stage: "customer", error: "Profilo cliente non disponibile." }, 403);
     }
 
     const { data: bookings, error } = await db
       .from("bookings")
-      .select("id,plate,vehicle_make,vehicle_model,vehicle_year,requested_date,requested_slot,status,service_key,urgency,customer_price_cents,workshop_id,created_at,updated_at")
+      .select("*")
       .eq("customer_id", customer.id)
       .order("created_at", { ascending: false });
 
     if (error) {
-      return NextResponse.json({
+      console.error("CUSTOMER_BOOKINGS_QUERY_ERROR", {
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        message: error.message,
+        customerId: customer.id,
+      });
+      return json({
+        stage: "bookings",
         error: error.message,
         code: error.code,
         details: error.details,
         hint: error.hint,
-      }, { status: 400 });
+        customerId: customer.id,
+      }, 400);
     }
 
     const normalizedBookings = (bookings ?? []).map((booking) => ({
-      ...booking,
-      practice_code: null,
+      id: booking.id ?? null,
+      practice_code: booking.practice_code ?? null,
+      plate: booking.plate ?? "",
+      vehicle_make: booking.vehicle_make ?? null,
+      vehicle_model: booking.vehicle_model ?? null,
+      vehicle_year: booking.vehicle_year ?? null,
+      requested_date: booking.requested_date ?? null,
+      requested_slot: booking.requested_slot ?? null,
+      status: booking.status ?? "",
+      service_key: booking.service_key ?? "",
+      urgency: booking.urgency ?? false,
+      customer_price_cents: booking.customer_price_cents ?? 0,
+      workshop_id: booking.workshop_id ?? null,
+      created_at: booking.created_at ?? null,
+      updated_at: booking.updated_at ?? null,
     }));
 
-    return NextResponse.json({ customer, bookings: normalizedBookings });
+    return json({
+      stage: "done",
+      customer,
+      bookings: normalizedBookings,
+      bookingColumns: bookings && bookings.length > 0 ? Object.keys(bookings[0]) : [],
+    });
   } catch (error) {
     console.error("CUSTOMER_BOOKINGS_ERROR", error);
-    return NextResponse.json({
+    return json({
+      stage: "exception",
       error: error instanceof Error ? error.message : String(error),
-    }, { status: 500 });
+    }, 500);
   }
 }
