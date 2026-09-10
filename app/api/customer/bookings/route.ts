@@ -28,7 +28,7 @@ export async function GET() {
 
     const { data: bookings, error } = await db
       .from("bookings")
-      .select("id,practice_code,plate,vehicle_make,vehicle_model,vehicle_year,requested_date,requested_slot,status,service_key,urgency,customer_price_cents,workshop_id,created_at,updated_at")
+      .select("id,plate,vehicle_make,vehicle_model,vehicle_year,requested_date,requested_slot,status,service_key,urgency,customer_price_cents,workshop_id,created_at,updated_at")
       .eq("customer_id", customer.id)
       .order("created_at", { ascending: false });
 
