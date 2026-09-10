@@ -1,34 +1,17 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-function getConfig() {
-  const runtime = typeof window !== "undefined"
-    ? (window as Window & { __VERIDRIVE_SUPABASE__?: { url?: string; publishableKey?: string } }).__VERIDRIVE_SUPABASE__
-    : undefined;
-
-  const url =
-    runtime?.url ??
-    process.env.NEXT_PUBLIC_SUPABASE_URL ??
-    process.env.SUPABASE_URL;
-
-  const key =
-    runtime?.publishableKey ??
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.SUPABASE_PUBLISHABLE_KEY;
-
-  return { url, key };
-}
-
 export function createClient() {
-  const { url, key } = getConfig();
+  const configUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const configKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!url || !key) {
+  if (!configUrl || !configKey) {
     throw new Error("Supabase non configurato.");
   }
 
-  return createBrowserClient(url, key, {
+  return createBrowserClient(configUrl, configKey, {
     cookieOptions: {
       sameSite: "lax",
-      secure: typeof window !== "undefined" && window.location.protocol === "https:",
+      secure: true,
     },
     auth: {
       persistSession: true,
