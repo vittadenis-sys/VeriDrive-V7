@@ -21,16 +21,21 @@ export default function AdminClientiPage() {
   const [message, setMessage] = useState("");
 
   async function load(nextSearch = search) {
+    setMessage("");
     try {
       const query = nextSearch.trim() ? `?search=${encodeURIComponent(nextSearch.trim())}` : "";
-      const response = await fetch(`/api/admin/customers${query}`, { cache: "no-store" });
+      const response = await fetch(`/api/admin/customers${query}`, {
+        cache: "no-store",
+        credentials: "include",
+        headers: { "Cache-Control": "no-store" },
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Impossibile caricare i clienti.");
-      const nextCustomers = data.customers ?? [];
+      const nextCustomers = (data.customers ?? []) as Customer[];
       setCustomers(nextCustomers);
-      setBonusDrafts(Object.fromEntries(nextCustomers.map((customer: Customer) => [customer.id, customer.autogerma_free_booking_bonus ?? 0])));
-      setMessage("");
+      setBonusDrafts(Object.fromEntries(nextCustomers.map((customer) => [customer.id, customer.autogerma_free_booking_bonus ?? 0])));
     } catch (error) {
+      setCustomers([]);
       setMessage(error instanceof Error ? error.message : "Errore.");
     }
   }
@@ -43,7 +48,8 @@ export default function AdminClientiPage() {
     try {
       const response = await fetch(`/api/admin/customers/${customer.id}/demo`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
         body: JSON.stringify({ demoAccess: !customer.demo_access }),
       });
       const data = await response.json();
@@ -63,7 +69,8 @@ export default function AdminClientiPage() {
     try {
       const response = await fetch(`/api/admin/customers/${customer.id}/bonus`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
         body: JSON.stringify({ bonus }),
       });
       const data = await response.json();
@@ -89,7 +96,7 @@ export default function AdminClientiPage() {
       </div>
       {message && <p className="notice">{message}</p>}
       <section className="panel" style={{ marginTop: 20 }}>
-        {customers.length === 0 ? <p style={{ marginBottom: 0 }}>Nessun cliente trovato.</p> : <div style={{ display: "grid", gap: 12 }}>
+        {customers.length === 0 ? <p style={{ marginBottom: 0 }}>{message ? "Nessun dato caricato." : "Nessun cliente trovato."}</p> : <div style={{ display: "grid", gap: 12 }}>
           {customers.map((customer) => <div key={customer.id} className="card" style={{ display: "grid", gap: 14 }}>
             <div style={{ display: "flex", gap: 16, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
               <div>
