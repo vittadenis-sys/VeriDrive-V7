@@ -41,7 +41,7 @@ type Booking = {
   updated_at: string;
 };
 
-type Payload = { customer: { id: string; full_name: string; phone: string | null; demo_access: boolean }; bookings: Booking[] };
+type Payload = { customer: { id: string; full_name: string; phone: string | null }; bookings: Booking[] };
 
 function money(cents: number) {
   return `€${(cents / 100).toFixed(2).replace(".", ",")}`;
