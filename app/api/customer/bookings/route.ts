@@ -13,7 +13,7 @@ export async function GET() {
     const db = createServiceClient();
     const { data: customer, error: customerError } = await db
       .from("customers")
-      .select("id,full_name,phone,demo_access,autogerma_free_booking_bonus")
+      .select("id,full_name,phone,autogerma_free_booking_bonus")
       .eq("auth_id", user.id)
       .maybeSingle();
 
