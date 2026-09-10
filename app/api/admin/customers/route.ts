@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
     let query = db
       .from("customers")
-      .select("id,full_name,phone,demo_access,autogerma_free_booking_bonus,created_at")
+      .select("id,full_name,phone,autogerma_free_booking_bonus,created_at")
       .order("created_at", { ascending: false });
 
     if (search) {
@@ -57,8 +57,13 @@ export async function GET(request: Request) {
       );
     }
 
+    const customers = (data ?? []).map((customer) => ({
+      ...customer,
+      demo_access: false,
+    }));
+
     return NextResponse.json(
-      { customers: data ?? [] },
+      { customers },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
