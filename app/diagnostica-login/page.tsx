@@ -15,6 +15,7 @@ type Result = {
   ok: boolean | null;
   data: unknown;
   error?: string;
+  durationMs?: number;
 };
 
 export default function DiagnosticaLoginPage() {
@@ -58,7 +59,7 @@ export default function DiagnosticaLoginPage() {
             ok: response.ok,
             data,
             durationMs: Math.round(performance.now() - started),
-          } as Result,
+          },
         }));
       } catch (error) {
         setResults((prev) => ({
@@ -70,7 +71,7 @@ export default function DiagnosticaLoginPage() {
             data: null,
             error: error instanceof Error ? error.message : String(error),
             durationMs: Math.round(performance.now() - started),
-          } as Result,
+          },
         }));
       }
     }
@@ -114,7 +115,7 @@ export default function DiagnosticaLoginPage() {
           </div>
           {result && (
             <>
-              <div style={{ marginTop: 8, color: "#666" }}>{result.url} · {"durationMs" in result ? result.durationMs : "?"} ms</div>
+              <div style={{ marginTop: 8, color: "#666" }}>{result.url} · {typeof result.durationMs === "number" ? result.durationMs : "?"} ms</div>
               <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", marginTop: 12, background: "#111", color: "#eee", padding: 14, borderRadius: 8, overflowX: "auto" }}>
                 {JSON.stringify(result.error ? { error: result.error } : result.data, null, 2)}
               </pre>
