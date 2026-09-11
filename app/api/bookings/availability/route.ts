@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
   const { data: workshops, error: workshopError } = await supabase
     .from("workshops")
-    .select("id,name,city,address,postal_code,latitude,longitude,is_active")
+    .select("id,name,city,address,latitude,longitude,is_active")
     .eq("is_active", true)
     .order("city", { ascending: true });
   if (workshopError) return NextResponse.json({ error: workshopError.message }, { status: 400 });
