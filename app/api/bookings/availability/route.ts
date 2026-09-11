@@ -29,26 +29,32 @@ export async function GET(request: Request) {
 
   const { data: workshops, error: workshopError } = await supabase
     .from("workshops")
-    .select("id,name,city,address")
+    .select("id,name,city,address,cap,lat,lng,active")
+    .eq("active", true)
     .order("city", { ascending: true });
   if (workshopError) return NextResponse.json({ error: workshopError.message }, { status: 400 });
 
   const weekday = requested.getDay() || 7;
   const results = [];
   for (const workshop of workshops ?? []) {
-    const { data: settings } = await supabase.from("workshop_settings").select("max_daily_inspections,accepts_urgent").eq("workshop_id", workshop.id).maybeSingle();
-    if (urgency && !settings?.accepts_urgent) continue;
-    const { data: closure } = await supabase.from("workshop_closures").select("id").eq("workshop_id", workshop.id).lte("starts_on", date).gte("ends_on", date).limit(1);
-    if ((closure ?? []).length) continue;
-    const { data: slots } = await supabase.from("workshop_schedule").select("slot_time").eq("workshop_id", workshop.id).eq("weekday", weekday).eq("active", true).order("slot_time");
-    if (!slots?.length) continue;
-    const { count } = await supabase.from("bookings").select("id", { count: "exact", head: true }).eq("workshop_id", workshop.id).eq("requested_date", date).in("status", ["requested", "assigned", "confirmed", "in_progress"]);
-    if ((count ?? 0) >= (settings?.max_daily_inspections ?? 3)) continue;
-    const { data: booked } = await supabase.from("bookings").select("requested_slot").eq("workshop_id", workshop.id).eq("requested_date", date).in("status", ["requested", "assigned", "confirmed", "in_progress"]);
+    const availableSlots = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"].filter((slot) => true);
+    const { data: booked } = await supabase
+      .from("bookings")
+      .select("requested_slot")
+      .eq("workshop_id", workshop.id)
+      .eq("requested_date", date)
+      .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
     const busy = new Set((booked ?? []).map((b) => b.requested_slot).filter(Boolean));
-    const availableSlots = slots.map((s) => s.slot_time).filter((slot) => !busy.has(slot));
-    if (!availableSlots.length) continue;
-    results.push({ ...workshop, display_name: workshop.city ? `VeriDrive ${workshop.city} — ${workshop.name}` : `VeriDrive — ${workshop.name}`, availableSlots });
+    const slots = availableSlots.filter((slot) => !busy.has(slot));
+    if (!slots.length) continue;
+    results.push({
+      ...workshop,
+      display_name: workshop.city ? `VeriDrive ${workshop.city} — ${workshop.name}` : `VeriDrive — ${workshop.name}`,
+      availableSlots: slots,
+      latitude: workshop.lat ?? null,
+      longitude: workshop.lng ?? null,
+      postal_code: workshop.cap ?? null,
+    });
   }
   return NextResponse.json({ online: false, urgency, workshops: results, priceCents: getCustomerPriceCents(serviceKey, urgency) });
 }
