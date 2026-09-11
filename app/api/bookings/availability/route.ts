@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     const busy = new Set((booked ?? []).map((b) => b.requested_slot).filter(Boolean));
     const availableSlots = slots.map((s) => s.slot_time).filter((slot) => !busy.has(slot));
     if (!availableSlots.length) continue;
-    results.push({ ...workshop, display_name: workshop.city ? `VeriDrive ${workshop.city} — ${workshop.name}` : `VeriDrive — ${workshop.name}`, availableSlots, latitude: null, longitude: null });
+    results.push({ ...workshop, display_name: workshop.city ? `VeriDrive ${workshop.city} — ${workshop.name}` : `VeriDrive — ${workshop.name}`, availableSlots });
   }
   return NextResponse.json({ online: false, urgency, workshops: results, priceCents: getCustomerPriceCents(serviceKey, urgency) });
 }
