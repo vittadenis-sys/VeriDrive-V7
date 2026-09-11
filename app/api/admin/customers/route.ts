@@ -57,10 +57,37 @@ export async function GET(request: Request) {
       );
     }
 
+    const customerIds = (data ?? []).map((customer) => customer.id);
+    const bonusMap = new Map<string, number>();
+
+    if (customerIds.length > 0) {
+      const { data: bonuses, error: bonusError } = await db
+        .from("customer_bonus")
+        .select("customer_id,free_bookings")
+        .in("customer_id", customerIds);
+
+      if (bonusError) {
+        console.error("ADMIN_CUSTOMERS_BONUS_QUERY_ERROR", bonusError);
+        return NextResponse.json(
+          {
+            error: bonusError.message,
+            code: bonusError.code,
+            details: bonusError.details,
+            hint: bonusError.hint,
+          },
+          { status: 400, headers: { "Cache-Control": "no-store" } }
+        );
+      }
+
+      for (const bonus of bonuses ?? []) {
+        bonusMap.set(bonus.customer_id, Number(bonus.free_bookings ?? 0));
+      }
+    }
+
     const customers = (data ?? []).map((customer) => ({
       ...customer,
       demo_access: false,
-      autogerma_free_booking_bonus: 0,
+      autogerma_free_booking_bonus: bonusMap.get(customer.id) ?? 0,
     }));
 
     return NextResponse.json(
