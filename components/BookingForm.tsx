@@ -49,6 +49,11 @@ export function BookingForm(){
     finally{setLoadingSlots(false);}
   }
 
+  useEffect(()=>{
+    if(!date || isOnline) return;
+    void refreshAvailability(service,date,urgency);
+  },[date,service,urgency,isOnline]);
+
   function handleServiceChange(next:ServiceKey){setService(next);setReferenceType(next==="check_online"?"listing":"plate");setUrgency(false);setWorkshops([]);setSelectedWorkshop("");setSlot("");}
 
   async function submit(form:FormData){
@@ -80,7 +85,7 @@ export function BookingForm(){
     <label>Modello <span style={{opacity:.7}}>(facoltativo)</span><input name="model" placeholder="Es. Golf 1.5 TSI"/></label>
     {!isOnline&&<>
       <label className="full">Dove si trova l'auto?<input name="location" value={location} onChange={e=>setLocation(e.target.value)} required placeholder="Indirizzo, CAP o città"/></label>
-      <label className="full">Data preferita<input name="date" type="date" value={date} onChange={e=>{setDate(e.target.value);void refreshAvailability(service,e.target.value,urgency);}} required/></label>
+      <label className="full">Data preferita<input name="date" type="date" value={date} onChange={e=>setDate(e.target.value)} required/></label>
       <label className="full">Officina e slot{loadingSlots?<span>Ricerca disponibilità…</span>:workshops.length===0?<span className="notice" style={{marginTop:0}}>Scegli una data per vedere le officine disponibili.</span>:<div style={{display:"grid",gap:10}}>{workshops.map(workshop=><div key={workshop.id} className={`card ${selectedWorkshop===workshop.id?"selected-option":""}`} style={{padding:14}}><button type="button" className="button secondary" style={{width:"100%",justifyContent:"space-between"}} onClick={()=>{setSelectedWorkshop(workshop.id);setSlot("");}}><span style={{textAlign:"left"}}><b>{workshop.display_name}</b><small style={{display:"block",marginTop:4,opacity:.75}}>{[workshop.address,workshop.city].filter(Boolean).join(" · ")}</small></span><span>Seleziona</span></button>{selectedWorkshop===workshop.id&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>{workshop.availableSlots.map(item=><button key={item} type="button" className={`button ${slot===item?"":"secondary"}`} onClick={()=>setSlot(item)}>{item}</button>)}</div>}</div>)}</div>}</label>
       <label className="full" style={{display:"flex",gap:12,alignItems:"center"}}><input name="urgency" type="checkbox" checked={urgency} onChange={e=>{setUrgency(e.target.checked);if(date)void refreshAvailability(service,date,e.target.checked);}} style={{width:22,height:22}}/><span><b>Urgenza +25 €</b><br/><small>Disponibilità tra 24 e 48 ore, quando presente.</small></span></label>
     </>}
