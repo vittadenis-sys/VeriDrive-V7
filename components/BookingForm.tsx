@@ -3,13 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { VERIDRIVE_SERVICES, CUSTOMER_SERVICE_GROUPS } from "@/lib/services";
 
 type ServiceKey = keyof typeof VERIDRIVE_SERVICES;
-type Workshop = { id:string; display_name:string; city:string|null; address:string|null; postal_code:string|null; availableSlots:string[]; latitude:number|null; longitude:number|null };
-
-function distanceKm(lat1:number, lon1:number, lat2:number, lon2:number){
-  const r=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return 2*r*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
+type Workshop = { id:string; display_name:string; city:string|null; address:string|null; availableSlots:string[] };
 
 export function BookingForm(){
   const params=typeof window!=="undefined"?new URLSearchParams(window.location.search):null;
@@ -20,7 +14,7 @@ export function BookingForm(){
   const [referenceType,setReferenceType]=useState<"plate"|"listing">(initialService==="check_online"?"listing":"plate");
   const [urgency,setUrgency]=useState(false);
   const [date,setDate]=useState(""); const [slot,setSlot]=useState(""); const [location,setLocation]=useState("");
-  const [workshops,setWorkshops]=useState<(Workshop&{distanceKm?:number})[]>([]); const [selectedWorkshop,setSelectedWorkshop]=useState("");
+  const [workshops,setWorkshops]=useState<Workshop[]>([]); const [selectedWorkshop,setSelectedWorkshop]=useState("");
   const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false); const [loadingSlots,setLoadingSlots]=useState(false);
   const [autogermaBonus,setAutogermaBonus]=useState(0); const [bonusLoaded,setBonusLoaded]=useState(false);
   const selected=VERIDRIVE_SERVICES[service];
@@ -43,14 +37,13 @@ export function BookingForm(){
     try{
       const response=await fetch(`/api/bookings/availability?service=${encodeURIComponent(nextService)}&date=${encodeURIComponent(nextDate)}&urgency=${nextUrgency}`,{cache:"no-store"});
       const data=await response.json(); if(!response.ok) throw new Error(data.error||"Disponibilità non disponibile.");
-      let nextWorkshops:(Workshop&{distanceKm?:number})[] = data.workshops??[];
-      if(typeof navigator!=="undefined"&&navigator.geolocation){
-        await new Promise<void>((resolve)=>navigator.geolocation.getCurrentPosition(position=>{
-          const {latitude,longitude}=position.coords;
-          nextWorkshops=nextWorkshops.map(workshop=>workshop.latitude!=null&&workshop.longitude!=null?{...workshop,distanceKm:distanceKm(latitude,longitude,workshop.latitude,workshop.longitude)}:workshop).sort((a,b)=>(a.distanceKm??Number.POSITIVE_INFINITY)-(b.distanceKm??Number.POSITIVE_INFINITY));
-          resolve();
-        },()=>resolve(),{enableHighAccuracy:false,maximumAge:300000,timeout:5000}));
-      }
+      const nextWorkshops:Workshop[]=(data.workshops??[]).map((workshop:Workshop)=>({
+        id:workshop.id,
+        display_name:workshop.display_name,
+        city:workshop.city ?? null,
+        address:workshop.address ?? null,
+        availableSlots:Array.isArray(workshop.availableSlots)?workshop.availableSlots:[],
+      }));
       setWorkshops(nextWorkshops); setSelectedWorkshop(""); setSlot("");
     }catch(error){setWorkshops([]);setMessage(error instanceof Error?error.message:"Disponibilità non disponibile.");}
     finally{setLoadingSlots(false);}
@@ -88,7 +81,7 @@ export function BookingForm(){
     {!isOnline&&<>
       <label className="full">Dove si trova l'auto?<input name="location" value={location} onChange={e=>setLocation(e.target.value)} required placeholder="Indirizzo, CAP o città"/></label>
       <label className="full">Data preferita<input name="date" type="date" value={date} onChange={e=>{setDate(e.target.value);void refreshAvailability(service,e.target.value,urgency);}} required/></label>
-      <label className="full">Officina e slot{loadingSlots?<span>Ricerca disponibilità e distanza…</span>:workshops.length===0?<span className="notice" style={{marginTop:0}}>Scegli una data per vedere le officine disponibili.</span>:<div style={{display:"grid",gap:10}}>{workshops.map(workshop=><div key={workshop.id} className={`card ${selectedWorkshop===workshop.id?"selected-option":""}`} style={{padding:14}}><button type="button" className="button secondary" style={{width:"100%",justifyContent:"space-between"}} onClick={()=>{setSelectedWorkshop(workshop.id);setSlot("");}}><span style={{textAlign:"left"}}><b>{workshop.display_name}</b><small style={{display:"block",marginTop:4,opacity:.75}}>{[workshop.address,workshop.postal_code,workshop.city].filter(Boolean).join(" · ")}{workshop.distanceKm!=null?` · ${workshop.distanceKm.toFixed(1).replace('.',',')} km`:""}</small></span><span>Seleziona</span></button>{selectedWorkshop===workshop.id&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>{workshop.availableSlots.map(item=><button key={item} type="button" className={`button ${slot===item?"":"secondary"}`} onClick={()=>setSlot(item)}>{item}</button>)}</div>}</div>)}</div>}</label>
+      <label className="full">Officina e slot{loadingSlots?<span>Ricerca disponibilità…</span>:workshops.length===0?<span className="notice" style={{marginTop:0}}>Scegli una data per vedere le officine disponibili.</span>:<div style={{display:"grid",gap:10}}>{workshops.map(workshop=><div key={workshop.id} className={`card ${selectedWorkshop===workshop.id?"selected-option":""}`} style={{padding:14}}><button type="button" className="button secondary" style={{width:"100%",justifyContent:"space-between"}} onClick={()=>{setSelectedWorkshop(workshop.id);setSlot("");}}><span style={{textAlign:"left"}}><b>{workshop.display_name}</b><small style={{display:"block",marginTop:4,opacity:.75}}>{[workshop.address,workshop.city].filter(Boolean).join(" · ")}</small></span><span>Seleziona</span></button>{selectedWorkshop===workshop.id&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>{workshop.availableSlots.map(item=><button key={item} type="button" className={`button ${slot===item?"":"secondary"}`} onClick={()=>setSlot(item)}>{item}</button>)}</div>}</div>)}</div>}</label>
       <label className="full" style={{display:"flex",gap:12,alignItems:"center"}}><input name="urgency" type="checkbox" checked={urgency} onChange={e=>{setUrgency(e.target.checked);if(date)void refreshAvailability(service,date,e.target.checked);}} style={{width:22,height:22}}/><span><b>Urgenza +25 €</b><br/><small>Disponibilità tra 24 e 48 ore, quando presente.</small></span></label>
     </>}
     <div className="full panel" style={{marginTop:8}}><p><b>Totale: €{price.toFixed(2).replace('.',',')}</b></p><p style={{marginBottom:0}}>{isOnline?"Nessun appuntamento: il servizio viene preso in carico online dopo il pagamento.":"Gli appuntamenti standard richiedono almeno 48 ore di preavviso. Puoi spostarli una sola volta, gratuitamente, almeno 24 ore prima."}</p></div>
