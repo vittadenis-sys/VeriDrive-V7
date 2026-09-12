@@ -6,7 +6,9 @@ export async function GET() {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const db = createServiceClient();
     const { data: workshop, error: workshopError } = await db
@@ -16,7 +18,9 @@ export async function GET() {
       .maybeSingle();
 
     if (workshopError) throw workshopError;
-    if (!workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
+    if (!workshop) {
+      return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
+    }
 
     const { data: bookings, error: bookingsError } = await db
       .from("bookings")
@@ -31,7 +35,7 @@ export async function GET() {
 
     const [{ data: customers, error: customersError }, { data: vehicles, error: vehiclesError }] = await Promise.all([
       customerIds.length
-        ? db.from("customers").select("id,full_name,email,phone").in("id", customerIds)
+        ? db.from("customers").select("id,full_name,phone").in("id", customerIds)
         : Promise.resolve({ data: [], error: null }),
       vehicleIds.length
         ? db.from("vehicles").select("*").in("id", vehicleIds)
