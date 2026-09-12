@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-const ROUTE_VERSION = "customer-bookings-diag-2026-09-10-v1";
+const ROUTE_VERSION = "customer-bookings-diag-2026-09-12-v2";
 
 function json(data: Record<string, unknown>, status = 200) {
   return NextResponse.json({ routeVersion: ROUTE_VERSION, ...data }, {
@@ -19,10 +19,7 @@ export async function GET() {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return json({
-        stage: "auth",
-        error: authError?.message ?? "Accesso richiesto.",
-      }, 401);
+      return json({ stage: "auth", error: authError?.message ?? "Accesso richiesto." }, 401);
     }
 
     const db = createServiceClient();
@@ -33,25 +30,24 @@ export async function GET() {
       .maybeSingle();
 
     if (customerError) {
-      console.error("CUSTOMER_PROFILE_LOOKUP_ERROR", {
-        code: customerError.code,
-        details: customerError.details,
-        hint: customerError.hint,
-        message: customerError.message,
-        userId: user.id,
-      });
-      return json({
-        stage: "customer",
-        error: customerError.message,
-        code: customerError.code,
-        details: customerError.details,
-        hint: customerError.hint,
-      }, 500);
+      console.error("CUSTOMER_PROFILE_LOOKUP_ERROR", { code: customerError.code, details: customerError.details, hint: customerError.hint, message: customerError.message, userId: user.id });
+      return json({ stage: "customer", error: customerError.message, code: customerError.code, details: customerError.details, hint: customerError.hint }, 500);
     }
 
-    if (!customer) {
-      return json({ stage: "customer", error: "Profilo cliente non disponibile." }, 403);
+    if (!customer) return json({ stage: "customer", error: "Profilo cliente non disponibile." }, 403);
+
+    const { data: bonusRow, error: bonusError } = await db
+      .from("customer_bonus")
+      .select("free_bookings")
+      .eq("customer_id", customer.id)
+      .maybeSingle();
+
+    if (bonusError) {
+      console.error("CUSTOMER_BONUS_LOOKUP_ERROR", { code: bonusError.code, details: bonusError.details, hint: bonusError.hint, message: bonusError.message, customerId: customer.id });
+      return json({ stage: "bonus", error: bonusError.message, code: bonusError.code, details: bonusError.details, hint: bonusError.hint, customerId: customer.id }, 500);
     }
+
+    const autogermaFreeBookingBonus = Number(bonusRow?.free_bookings ?? 0);
 
     const { data: bookings, error } = await db
       .from("bookings")
@@ -60,36 +56,25 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("CUSTOMER_BOOKINGS_QUERY_ERROR", {
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
-        message: error.message,
-        customerId: customer.id,
-      });
-      return json({
-        stage: "bookings",
-        error: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
-        customerId: customer.id,
-      }, 400);
+      console.error("CUSTOMER_BOOKINGS_QUERY_ERROR", { code: error.code, details: error.details, hint: error.hint, message: error.message, customerId: customer.id });
+      return json({ stage: "bookings", error: error.message, code: error.code, details: error.details, hint: error.hint, customerId: customer.id }, 400);
     }
 
     const normalizedBookings = (bookings ?? []).map((booking) => ({
       id: booking.id ?? null,
-      practice_code: booking.practice_code ?? null,
+      booking_code: booking.booking_code ?? null,
+      practice_code: booking.booking_code ?? null,
       plate: booking.plate ?? "",
       vehicle_make: booking.vehicle_make ?? null,
       vehicle_model: booking.vehicle_model ?? null,
       vehicle_year: booking.vehicle_year ?? null,
       requested_date: booking.requested_date ?? null,
-      requested_slot: booking.requested_slot ?? null,
+      requested_slot: booking.slot ?? null,
+      inspection_date: booking.inspection_date ?? null,
       status: booking.status ?? "",
-      service_key: booking.service_key ?? "",
+      service_key: booking.service_key ?? booking.service ?? "",
       urgency: booking.urgency ?? false,
-      customer_price_cents: booking.customer_price_cents ?? 0,
+      customer_price_cents: booking.customer_price_cents ?? booking.total ?? 0,
       workshop_id: booking.workshop_id ?? null,
       created_at: booking.created_at ?? null,
       updated_at: booking.updated_at ?? null,
@@ -97,15 +82,16 @@ export async function GET() {
 
     return json({
       stage: "done",
-      customer,
+      customer: {
+        ...customer,
+        autogerma_free_booking_bonus: autogermaFreeBookingBonus,
+        free_bookings: autogermaFreeBookingBonus,
+      },
       bookings: normalizedBookings,
       bookingColumns: bookings && bookings.length > 0 ? Object.keys(bookings[0]) : [],
     });
   } catch (error) {
     console.error("CUSTOMER_BOOKINGS_ERROR", error);
-    return json({
-      stage: "exception",
-      error: error instanceof Error ? error.message : String(error),
-    }, 500);
+    return json({ stage: "exception", error: error instanceof Error ? error.message : String(error) }, 500);
   }
 }
