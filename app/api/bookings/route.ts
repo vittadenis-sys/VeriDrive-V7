@@ -39,16 +39,16 @@ export async function POST(request: Request) {
 
   const date = isOnline ? null : String(body.date ?? "").trim();
   const slot = isOnline ? null : String(body.slot ?? "").trim();
-  const location = service.workshop ? String(body.location ?? "").trim() : null;
   if (!isOnline && !isValidDate(date)) return NextResponse.json({ error: "Data non valida." }, { status: 400 });
   if (!isOnline && !slot) return NextResponse.json({ error: "Orario mancante." }, { status: 400 });
-  if (service.workshop && !location) return NextResponse.json({ error: "Indica dove si trova l'auto." }, { status: 400 });
 
   let workshop: { id: string; name: string; email: string | null; city: string | null } | null = null;
   if (!isOnline) {
     const workshopId = String(body.workshopId ?? "").trim();
     if (!workshopId) return NextResponse.json({ error: "Seleziona un'officina." }, { status: 400 });
-    const { data, error } = await supabase
+
+    const db = createServiceClient();
+    const { data, error } = await db
       .from("workshops")
       .select("id,name,email,city,active")
       .eq("id", workshopId)
@@ -61,7 +61,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "La prenotazione gratuita è disponibile solo presso Autogerma." }, { status: 400 });
     }
 
-    const db = createServiceClient();
     const { data: booked, error: bookedError } = await db
       .from("bookings")
       .select("id,inspection_date")
@@ -70,12 +69,11 @@ export async function POST(request: Request) {
       .lte("inspection_date", `${date}T23:59:59`)
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
     if (bookedError) return NextResponse.json({ error: bookedError.message }, { status: 400 });
-    if (!slot) return NextResponse.json({ error: "Orario mancante." }, { status: 400 });
+
     const requestedSlotTime = slot.slice(0, 5);
     if ((booked ?? []).some((booking) => {
       if (!booking.inspection_date) return false;
-      const value = String(booking.inspection_date);
-      return value.slice(11, 16) === requestedSlotTime;
+      return String(booking.inspection_date).slice(11, 16) === requestedSlotTime;
     })) {
       return NextResponse.json({ error: "Lo slot selezionato non è più disponibile. Aggiorna gli orari e riprova." }, { status: 409 });
     }
@@ -101,9 +99,7 @@ export async function POST(request: Request) {
       .eq("free_bookings", freeBookings)
       .select("free_bookings")
       .maybeSingle();
-    if (updateBonusError || !updatedBonus) {
-      return NextResponse.json({ error: "Il bonus per la prenotazione gratuita è stato usato da un'altra richiesta. Riprova." }, { status: 409 });
-    }
+    if (updateBonusError || !updatedBonus) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita è stato usato da un'altra richiesta. Riprova." }, { status: 409 });
   }
 
   const inspectionDate = isOnline ? null : `${date}T${slot}:00`;
@@ -125,10 +121,7 @@ export async function POST(request: Request) {
       const db = createServiceClient();
       const { data: bonus } = await db.from("customer_bonus").select("free_bookings").eq("customer_id", customer.id).maybeSingle();
       const freeBookings = Number(bonus?.free_bookings ?? 0);
-      await db
-        .from("customer_bonus")
-        .update({ free_bookings: freeBookings + 1, updated_at: new Date().toISOString() })
-        .eq("customer_id", customer.id);
+      await db.from("customer_bonus").update({ free_bookings: freeBookings + 1, updated_at: new Date().toISOString() }).eq("customer_id", customer.id);
     }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
