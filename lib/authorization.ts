@@ -38,8 +38,6 @@ export async function requireWorkshopOwner() {
 
   const db = createServiceClient();
 
-  // Workshop ownership is stored on public.workshops.owner_auth_id.
-  // Use the service client so the ownership lookup is not affected by RLS.
   const { data: workshop, error } = await db
     .from("workshops")
     .select("id,owner_auth_id,is_active")
