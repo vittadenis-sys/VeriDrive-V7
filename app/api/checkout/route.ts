@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const { data: booking, error: bookingError } = await supabase
     .from("bookings")
-    .select("id, plate, vehicle_make, vehicle_model, location, listing_url, customer_price_cents, service_key, stripe_checkout_session_id")
+    .select("id, plate, vehicle_make, vehicle_model, location, listing_url, customer_price_cents, service_key, stripe_checkout_session_id, paid_with_autogerma_bonus")
     .eq("id", bookingId)
     .eq("customer_id", customer.id)
     .single();
@@ -39,7 +39,18 @@ export async function POST(request: Request) {
       .eq("id", booking.id)
       .eq("customer_id", customer.id);
     if (error) return NextResponse.json({ error: "Impossibile confermare la prenotazione demo." }, { status: 500 });
-    return NextResponse.json({ demo: true, bookingId: booking.id, url: null });
+    return NextResponse.json({ demo: true, freeBooking: false, bookingId: booking.id, url: null });
+  }
+
+  if (booking.paid_with_autogerma_bonus || Number(booking.customer_price_cents ?? 0) === 0) {
+    const db = createServiceClient();
+    const { error } = await db
+      .from("bookings")
+      .update({ payment_status: "paid" })
+      .eq("id", booking.id)
+      .eq("customer_id", customer.id);
+    if (error) return NextResponse.json({ error: "Impossibile confermare la prenotazione gratuita." }, { status: 500 });
+    return NextResponse.json({ freeBooking: true, bookingId: booking.id, url: null });
   }
 
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -90,9 +101,7 @@ export async function POST(request: Request) {
     .eq("id", booking.id)
     .eq("customer_id", customer.id);
 
-  if (updateError) {
-    return NextResponse.json({ error: "Impossibile collegare il pagamento alla prenotazione." }, { status: 500 });
-  }
+  if (updateError) return NextResponse.json({ error: "Impossibile collegare il pagamento alla prenotazione." }, { status: 500 });
 
   return NextResponse.json({ url: session.url });
 }
