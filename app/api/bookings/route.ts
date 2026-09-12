@@ -39,16 +39,10 @@ export async function POST(request: Request) {
   const customerPriceCents = getCustomerPriceCents(serviceKey, urgency);
   if (customerPriceCents == null) return NextResponse.json({ error: "Impossibile calcolare il prezzo." }, { status: 400 });
 
-  const referenceType = body.referenceType === "listing" ? "listing" : "plate";
-  const reference = referenceType === "plate" ? String(body.plate ?? "").trim().toUpperCase() : String(body.listingUrl ?? "").trim();
-  if (!reference) return NextResponse.json({ error: referenceType === "plate" ? "Targa mancante." : "Link annuncio mancante." }, { status: 400 });
-
   const date = isOnline ? null : String(body.date ?? "").trim();
   const slot = isOnline ? null : String(body.slot ?? "").trim();
   if (!isOnline && !isValidDate(date)) return NextResponse.json({ error: "Data non valida." }, { status: 400 });
-  if (!isOnline || service.workshop) {
-    if (!isOnline && !slot) return NextResponse.json({ error: "Orario mancante." }, { status: 400 });
-  }
+  if (!isOnline && !slot) return NextResponse.json({ error: "Orario mancante." }, { status: 400 });
 
   let workshop: { id: string; name: string; email: string | null; city: string | null } | null = null;
   if (!isOnline) {
@@ -150,5 +144,10 @@ export async function POST(request: Request) {
     urgency,
   });
 
-  return NextResponse.json({ bookingId: data.id, practiceNumber: data.booking_code ?? null, service: service.key, freeBooking: wantsFreeBooking });
+  return NextResponse.json({
+    bookingId: data.id,
+    practiceNumber: data.booking_code ?? null,
+    service: service.key,
+    freeBooking: wantsFreeBooking,
+  });
 }
