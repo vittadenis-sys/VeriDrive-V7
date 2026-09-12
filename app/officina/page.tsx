@@ -7,21 +7,20 @@ import { Header } from "@/components/Header";
 
 type Booking = {
   id: string;
-  plate: string;
-  vehicle_make: string | null;
-  vehicle_model: string | null;
-  vehicle_year: number | null;
-  requested_date: string | null;
-  requested_slot: string | null;
+  booking_code: string | null;
+  customer_id: string;
+  vehicle_id: string | null;
+  workshop_id: string;
+  service: string;
   status: string;
-  service_key: string;
-  urgency: boolean;
-  customer_price_cents: number;
-  payout: { amount_cents: number; status: string; paid_at: string | null } | null;
+  inspection_date: string | null;
+  total: number | null;
+  vehicle?: Record<string, unknown> | null;
+  customer?: { id: string; full_name: string | null; email: string | null; phone: string | null } | null;
 };
 
 type DashboardPayload = {
-  workshop: { id: string; name: string; city: string | null; address: string | null; postal_code: string | null };
+  workshop: { id: string; name: string; city: string | null; address: string | null; cap: number | null };
   bookings: Booking[];
   isSuperAdmin?: boolean;
 };
@@ -51,6 +50,14 @@ const STATUS_LABELS: Record<string, string> = {
   refunded: "Rimborsata",
 };
 
+function vehicleLabel(vehicle: Record<string, unknown> | null | undefined) {
+  if (!vehicle) return "Veicolo";
+  const make = vehicle.make ?? vehicle.vehicle_make ?? vehicle.brand ?? vehicle.marca;
+  const model = vehicle.model ?? vehicle.vehicle_model ?? vehicle.modello;
+  const year = vehicle.year ?? vehicle.vehicle_year ?? vehicle.anno;
+  return [make, model, year].filter(Boolean).join(" ") || "Veicolo";
+}
+
 export default function Officina() {
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [message, setMessage] = useState("");
@@ -59,7 +66,7 @@ export default function Officina() {
   async function load() {
     setMessage("");
     try {
-      const response = await fetch("/api/workshop/dashboard", { cache: "no-store" });
+      const response = await fetch("/api/workshop/dashboard", { cache: "no-store", credentials: "include" });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Impossibile caricare la dashboard.");
       setData(payload);
@@ -74,9 +81,9 @@ export default function Officina() {
     const today = new Date().toISOString().slice(0, 10);
     const bookings = data?.bookings ?? [];
     return [
-      { label: "Prenotazioni oggi", value: String(bookings.filter((booking) => booking.requested_date === today).length), icon: ClipboardList },
-      { label: "Da completare", value: String(bookings.filter((booking) => ["assigned", "confirmed", "in_progress"].includes(booking.status)).length), icon: CalendarDays },
-      { label: "Da liquidare", value: `€${(bookings.filter((booking) => booking.payout?.status === "pending").reduce((sum, booking) => sum + (booking.payout?.amount_cents ?? 0), 0) / 100).toFixed(2).replace(".", ",")}`, icon: Euro },
+      { label: "Prenotazioni oggi", value: String(bookings.filter((booking) => booking.inspection_date?.slice(0, 10) === today).length), icon: ClipboardList },
+      { label: "Da completare", value: String(bookings.filter((booking) => ["requested", "assigned", "confirmed", "in_progress"].includes(booking.status)).length), icon: CalendarDays },
+      { label: "Da liquidare", value: `€${bookings.filter((booking) => ["requested", "assigned", "confirmed", "in_progress"].includes(booking.status)).reduce((sum, booking) => sum + Number(booking.total ?? 0), 0).toFixed(2).replace(".", ",")}`, icon: Euro },
     ];
   }, [data]);
 
@@ -86,6 +93,7 @@ export default function Officina() {
     try {
       const response = await fetch("/api/workshop/status", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId: id, toStatus }),
       });
@@ -146,33 +154,32 @@ export default function Officina() {
                 </div>
                 <span className="badge">{data?.bookings.length ?? 0} pratiche</span>
               </div>
-              {message && <p className="notice workshop-message">Impossibile caricare i dati dell'officina.</p>}
+              {message && <p className="notice workshop-message">{message}</p>}
               <div className="workshop-bookings">
                 {(data?.bookings ?? []).length === 0 && !message && <div className="notice">Nessuna pratica assegnata.</div>}
-                {(data?.bookings ?? []).map((booking) => {
-                  const vehicle = [booking.vehicle_make, booking.vehicle_model, booking.vehicle_year].filter(Boolean).join(" ");
-                  const payout = booking.payout ? `€${(booking.payout.amount_cents / 100).toFixed(2).replace(".", ",")}` : "—";
-                  return (
-                    <article className="workshop-booking" key={booking.id}>
-                      <div className="workshop-booking-main">
-                        <div className="workshop-booking-title">
-                          <strong>{vehicle || "Veicolo"}</strong>
-                          <span className="badge">{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>
-                          {booking.urgency && <span className="badge">Urgenza</span>}
-                        </div>
-                        <div className="workshop-booking-meta">{booking.plate} · {booking.requested_date ?? "Data da definire"} {booking.requested_slot ?? ""}</div>
+                {(data?.bookings ?? []).map((booking) => (
+                  <article className="workshop-booking" key={booking.id}>
+                    <div className="workshop-booking-main">
+                      <div className="workshop-booking-title">
+                        <strong>{vehicleLabel(booking.vehicle)}</strong>
+                        <span className="badge">{SERVICE_NAMES[booking.service] ?? booking.service}</span>
                       </div>
-                      <div className="workshop-booking-actions">
-                        <span className="badge">{STATUS_LABELS[booking.status] ?? booking.status}</span>
-                        {booking.status === "assigned" && <button className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "confirmed")}>{busyId === booking.id ? "…" : "Conferma"}</button>}
-                        {booking.status === "confirmed" && <button className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "in_progress")}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
-                        {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "refunded" && <Link className="button" href={`/officina/checklist?booking=${booking.id}`}>Checklist</Link>}
-                        {booking.status === "completed" && <Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Rivedi</Link>}
-                        <span className="workshop-payout">{payout}</span>
+                      <div className="workshop-booking-meta">
+                        {booking.booking_code ? `${booking.booking_code} · ` : ""}
+                        {booking.customer?.full_name || booking.customer?.email || "Cliente"} · {booking.inspection_date ? new Date(booking.inspection_date).toLocaleString("it-IT") : "Data da definire"}
                       </div>
-                    </article>
-                  );
-                })}
+                    </div>
+                    <div className="workshop-booking-actions">
+                      <span className="badge">{STATUS_LABELS[booking.status] ?? booking.status}</span>
+                      {booking.status === "requested" && <button className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "confirmed")}>{busyId === booking.id ? "…" : "Conferma"}</button>}
+                      {booking.status === "assigned" && <button className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "confirmed")}>{busyId === booking.id ? "…" : "Conferma"}</button>}
+                      {booking.status === "confirmed" && <button className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "in_progress")}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
+                      {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "refunded" && <Link className="button" href={`/officina/checklist?booking=${booking.id}`}>Checklist</Link>}
+                      {booking.status === "completed" && <Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Rivedi</Link>}
+                      {booking.total != null && <span className="workshop-payout">€{Number(booking.total).toFixed(2).replace(".", ",")}</span>}
+                    </div>
+                  </article>
+                ))}
               </div>
             </div>
           </section>
