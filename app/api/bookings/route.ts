@@ -48,7 +48,12 @@ export async function POST(request: Request) {
   if (!isOnline) {
     const workshopId = String(body.workshopId ?? "").trim();
     if (!workshopId) return NextResponse.json({ error: "Seleziona un'officina." }, { status: 400 });
-    const { data, error } = await supabase.from("workshops").select("id,name,email,city,is_active").eq("id", workshopId).eq("is_active", true).maybeSingle();
+    const { data, error } = await supabase
+      .from("workshops")
+      .select("id,name,email,city,active")
+      .eq("id", workshopId)
+      .eq("active", true)
+      .maybeSingle();
     if (error || !data) return NextResponse.json({ error: "Officina non disponibile." }, { status: 400 });
     workshop = data;
 
@@ -56,13 +61,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "La prenotazione gratuita è disponibile solo presso Autogerma." }, { status: 400 });
     }
 
-    const { data: booked } = await supabase
+    const db = createServiceClient();
+    const { data: booked, error: bookedError } = await db
       .from("bookings")
       .select("id")
       .eq("workshop_id", workshopId)
       .eq("requested_date", date)
-      .eq("requested_slot", slot)
+      .eq("slot", slot)
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
+    if (bookedError) return NextResponse.json({ error: bookedError.message }, { status: 400 });
     if ((booked ?? []).length) return NextResponse.json({ error: "Lo slot selezionato non è più disponibile. Aggiorna gli orari e riprova." }, { status: 409 });
   }
 
@@ -70,9 +77,25 @@ export async function POST(request: Request) {
 
   if (wantsFreeBooking) {
     const db = createServiceClient();
-    const { data: claimed, error: claimError } = await db.rpc("claim_autogerma_free_booking", { customer_uuid: customer.id });
-    if (claimError) return NextResponse.json({ error: "Impossibile verificare il bonus gratuito." }, { status: 500 });
-    if (claimed !== true) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita non è più disponibile." }, { status: 409 });
+    const { data: bonus, error: bonusError } = await db
+      .from("customer_bonus")
+      .select("free_bookings")
+      .eq("customer_id", customer.id)
+      .maybeSingle();
+    const freeBookings = Number(bonus?.free_bookings ?? 0);
+    if (bonusError) return NextResponse.json({ error: "Impossibile verificare il bonus gratuito." }, { status: 500 });
+    if (freeBookings < 1) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita non è più disponibile." }, { status: 409 });
+
+    const { data: updatedBonus, error: updateBonusError } = await db
+      .from("customer_bonus")
+      .update({ free_bookings: freeBookings - 1, updated_at: new Date().toISOString() })
+      .eq("customer_id", customer.id)
+      .eq("free_bookings", freeBookings)
+      .select("free_bookings")
+      .maybeSingle();
+    if (updateBonusError || !updatedBonus) {
+      return NextResponse.json({ error: "Il bonus per la prenotazione gratuita è stato usato da un'altra richiesta. Riprova." }, { status: 409 });
+    }
   }
 
   const insertPayload = {
@@ -82,7 +105,7 @@ export async function POST(request: Request) {
     vehicle_make: body.make ? String(body.make).trim() : null,
     vehicle_model: body.model ? String(body.model).trim() : null,
     requested_date: date,
-    requested_slot: slot,
+    slot,
     location,
     listing_url: referenceType === "listing" ? reference : null,
     service_key: serviceKey,
@@ -92,11 +115,16 @@ export async function POST(request: Request) {
     paid_with_autogerma_bonus: wantsFreeBooking,
   };
 
-  const { data, error } = await supabase.from("bookings").insert(insertPayload).select("id,practice_code").single();
+  const { data, error } = await supabase.from("bookings").insert(insertPayload).select("id").single();
   if (error) {
     if (wantsFreeBooking) {
       const db = createServiceClient();
-      await db.rpc("restore_autogerma_free_booking", { customer_uuid: customer.id });
+      const { data: bonus } = await db.from("customer_bonus").select("free_bookings").eq("customer_id", customer.id).maybeSingle();
+      const freeBookings = Number(bonus?.free_bookings ?? 0);
+      await db
+        .from("customer_bonus")
+        .update({ free_bookings: freeBookings + 1, updated_at: new Date().toISOString() })
+        .eq("customer_id", customer.id);
     }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
@@ -115,5 +143,5 @@ export async function POST(request: Request) {
     urgency,
   });
 
-  return NextResponse.json({ bookingId: data.id, practiceNumber: data.practice_code, service: service.key, freeBooking: wantsFreeBooking });
+  return NextResponse.json({ bookingId: data.id, practiceNumber: null, service: service.key, freeBooking: wantsFreeBooking });
 }
