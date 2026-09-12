@@ -14,17 +14,27 @@ function isValidDate(value: unknown) {
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
-  try { body = await request.json(); } catch { return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 }); }
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
+  }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Accedi prima di prenotare." }, { status: 401 });
 
-  const { data: customer, error: customerError } = await supabase.from("customers").select("id,full_name,phone").eq("auth_id", user.id).single();
+  const { data: customer, error: customerError } = await supabase
+    .from("customers")
+    .select("id,full_name,phone")
+    .eq("auth_id", user.id)
+    .single();
   if (customerError || !customer) return NextResponse.json({ error: "Profilo cliente non disponibile." }, { status: 400 });
 
   const serviceKey = String(body.service ?? body.service_key ?? "") as ServiceKey;
-  if (!SERVICE_KEYS.includes(serviceKey) || !getService(serviceKey)) return NextResponse.json({ error: "Servizio non valido." }, { status: 400 });
+  if (!SERVICE_KEYS.includes(serviceKey) || !getService(serviceKey)) {
+    return NextResponse.json({ error: "Servizio non valido." }, { status: 400 });
+  }
 
   const service = getService(serviceKey)!;
   const isOnline = serviceKey === "check_online";
@@ -34,8 +44,14 @@ export async function POST(request: Request) {
   if (customerPriceCents == null) return NextResponse.json({ error: "Impossibile calcolare il prezzo." }, { status: 400 });
 
   const referenceType = body.referenceType === "listing" ? "listing" : "plate";
-  const reference = referenceType === "plate" ? String(body.plate ?? "").trim().toUpperCase() : String(body.listingUrl ?? "").trim();
-  if (!reference) return NextResponse.json({ error: referenceType === "plate" ? "Targa mancante." : "Link annuncio mancante." }, { status: 400 });
+  const reference = referenceType === "plate"
+    ? String(body.plate ?? "").trim().toUpperCase()
+    : String(body.listingUrl ?? "").trim();
+  if (!reference) {
+    return NextResponse.json({
+      error: referenceType === "plate" ? "Targa mancante." : "Link annuncio mancante.",
+    }, { status: 400 });
+  }
 
   const date = isOnline ? null : String(body.date ?? "").trim();
   const slot = isOnline ? null : String(body.slot ?? "").trim();
@@ -70,7 +86,7 @@ export async function POST(request: Request) {
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
     if (bookedError) return NextResponse.json({ error: bookedError.message }, { status: 400 });
 
-    const requestedSlotTime = String(slot ?? "").slice(0, 5);
+    const requestedSlotTime = (slot ?? "").slice(0, 5);
     if ((booked ?? []).some((booking) => {
       if (!booking.inspection_date) return false;
       return String(booking.inspection_date).slice(11, 16) === requestedSlotTime;
@@ -80,17 +96,20 @@ export async function POST(request: Request) {
   }
 
   const wantsFreeBooking = requestedFreeBooking && Boolean(workshop) && workshop!.name.toLowerCase().includes("autogerma");
+  const db = createServiceClient();
 
   if (wantsFreeBooking) {
-    const db = createServiceClient();
     const { data: bonus, error: bonusError } = await db
       .from("customer_bonus")
       .select("free_bookings")
       .eq("customer_id", customer.id)
       .maybeSingle();
-    const freeBookings = Number(bonus?.free_bookings ?? 0);
     if (bonusError) return NextResponse.json({ error: "Impossibile verificare il bonus gratuito." }, { status: 500 });
-    if (freeBookings < 1) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita non è più disponibile." }, { status: 409 });
+
+    const freeBookings = Number(bonus?.free_bookings ?? 0);
+    if (freeBookings < 1) {
+      return NextResponse.json({ error: "Il bonus per la prenotazione gratuita non è più disponibile." }, { status: 409 });
+    }
 
     const { data: updatedBonus, error: updateBonusError } = await db
       .from("customer_bonus")
@@ -99,26 +118,37 @@ export async function POST(request: Request) {
       .eq("free_bookings", freeBookings)
       .select("free_bookings")
       .maybeSingle();
-    if (updateBonusError || !updatedBonus) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita è stato usato da un'altra richiesta. Riprova." }, { status: 409 });
+    if (updateBonusError || !updatedBonus) {
+      return NextResponse.json({ error: "Il bonus per la prenotazione gratuita è stato usato da un'altra richiesta. Riprova." }, { status: 409 });
+    }
   }
 
   const inspectionDate = isOnline ? null : `${date}T${slot}:00`;
   const insertPayload = {
     customer_id: customer.id,
     workshop_id: workshop?.id ?? null,
-    inspection_date: inspectionDate,
+    vehicle_id: null,
     service: serviceKey,
-    total: wantsFreeBooking ? 0 : customerPriceCents,
     status: "requested",
+    inspection_date: inspectionDate,
+    total: wantsFreeBooking ? 0 : customerPriceCents,
+    travel_km: 0,
+    overall_notes: null,
   };
 
-  const { data, error } = await supabase.from("bookings").insert(insertPayload).select("id,booking_code").single();
+  const { data, error } = await db
+    .from("bookings")
+    .insert(insertPayload)
+    .select("id,booking_code")
+    .single();
+
   if (error) {
     if (wantsFreeBooking) {
-      const db = createServiceClient();
-      const { data: bonus } = await db.from("customer_bonus").select("free_bookings").eq("customer_id", customer.id).maybeSingle();
-      const freeBookings = Number(bonus?.free_bookings ?? 0);
-      await db.from("customer_bonus").update({ free_bookings: freeBookings + 1, updated_at: new Date().toISOString() }).eq("customer_id", customer.id);
+      await db
+        .from("customer_bonus")
+        .update({ free_bookings: 1, updated_at: new Date().toISOString() })
+        .eq("customer_id", customer.id)
+        .eq("free_bookings", 0);
     }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
@@ -137,5 +167,10 @@ export async function POST(request: Request) {
     urgency,
   });
 
-  return NextResponse.json({ bookingId: data.id, practiceNumber: data.booking_code ?? null, service: service.key, freeBooking: wantsFreeBooking });
+  return NextResponse.json({
+    bookingId: data.id,
+    practiceNumber: data.booking_code ?? null,
+    service: service.key,
+    freeBooking: wantsFreeBooking,
+  });
 }
