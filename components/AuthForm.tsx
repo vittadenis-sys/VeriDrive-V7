@@ -63,7 +63,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       .from("workshops")
       .select("id")
       .eq("owner_auth_id", user.id)
-      .eq("is_active", true)
+      .eq("active", true)
       .maybeSingle();
 
     const { data: admin } = await supabase
