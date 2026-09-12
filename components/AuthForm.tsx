@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   async function submit(form: FormData) {
     if (!supabase) {
@@ -30,14 +31,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           },
         });
 
-    setBusy(false);
-
     if (result.error) {
+      setBusy(false);
       setMessage(result.error.message);
       return;
     }
 
     if (mode === "register") {
+      setBusy(false);
       setMessage("Controlla la tua email per confermare l’account. Il nuovo account parte come Cliente; Commerciante e Officina richiedono approvazione Admin.");
       return;
     }
@@ -45,6 +46,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     const session = result.data.session;
     const user = session?.user;
     if (!session || !user) {
+      setBusy(false);
       setMessage("Accesso completato ma sessione non disponibile.");
       return;
     }
@@ -55,6 +57,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       headers: { "Content-Type": "application/json" },
     });
     if (!bootstrap.ok) {
+      setBusy(false);
       setMessage("Accesso riuscito, ma non riesco a creare il profilo Cliente. Riprova tra poco.");
       return;
     }
@@ -72,13 +75,19 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       .eq("auth_id", user.id)
       .maybeSingle();
 
+    const next = searchParams.get("next");
+    const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+
+    setBusy(false);
+
     if (admin?.role === "super_admin" || admin?.role === "admin") {
-      router.replace("/admin");
+      router.replace(safeNext || "/admin");
     } else if (workshop) {
-      router.replace("/officina");
+      router.replace(safeNext || "/officina");
     } else {
-      router.replace("/dashboard");
+      router.replace(safeNext || "/dashboard");
     }
+    router.refresh();
   }
 
   return (
