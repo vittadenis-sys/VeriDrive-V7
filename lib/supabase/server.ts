@@ -2,12 +2,12 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-function readRuntimeEnv() {
+function readRuntimeEnv(): Record<string, string | undefined> {
   try {
     const context = getCloudflareContext();
-    return (context?.env ?? {}) as Record<string, string | undefined>;
+    return (context?.env ?? {}) as unknown as Record<string, string | undefined>;
   } catch {
-    return {} as Record<string, string | undefined>;
+    return {};
   }
 }
 
