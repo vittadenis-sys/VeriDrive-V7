@@ -14,27 +14,23 @@ function isValidDate(value: unknown) {
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 });
-  }
+  try { body = await request.json(); } catch { return NextResponse.json({ error: "Richiesta non valida." }, { status: 400 }); }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Accedi prima di prenotare." }, { status: 401 });
 
-  const { data: customer, error: customerError } = await supabase
+  const db = createServiceClient();
+  const { data: customer, error: customerError } = await db
     .from("customers")
     .select("id,full_name,phone")
     .eq("auth_id", user.id)
-    .single();
-  if (customerError || !customer) return NextResponse.json({ error: "Profilo cliente non disponibile." }, { status: 400 });
+    .maybeSingle();
+  if (customerError) return NextResponse.json({ error: customerError.message }, { status: 500 });
+  if (!customer) return NextResponse.json({ error: "Profilo cliente non disponibile." }, { status: 400 });
 
   const serviceKey = String(body.service ?? body.service_key ?? "") as ServiceKey;
-  if (!SERVICE_KEYS.includes(serviceKey) || !getService(serviceKey)) {
-    return NextResponse.json({ error: "Servizio non valido." }, { status: 400 });
-  }
+  if (!SERVICE_KEYS.includes(serviceKey) || !getService(serviceKey)) return NextResponse.json({ error: "Servizio non valido." }, { status: 400 });
 
   const service = getService(serviceKey)!;
   const isOnline = serviceKey === "check_online";
@@ -44,26 +40,21 @@ export async function POST(request: Request) {
   if (customerPriceCents == null) return NextResponse.json({ error: "Impossibile calcolare il prezzo." }, { status: 400 });
 
   const referenceType = body.referenceType === "listing" ? "listing" : "plate";
-  const reference = referenceType === "plate"
-    ? String(body.plate ?? "").trim().toUpperCase()
-    : String(body.listingUrl ?? "").trim();
-  if (!reference) {
-    return NextResponse.json({
-      error: referenceType === "plate" ? "Targa mancante." : "Link annuncio mancante.",
-    }, { status: 400 });
-  }
+  const reference = referenceType === "plate" ? String(body.plate ?? "").trim().toUpperCase() : String(body.listingUrl ?? "").trim();
+  if (!reference) return NextResponse.json({ error: referenceType === "plate" ? "Targa mancante." : "Link annuncio mancante." }, { status: 400 });
 
   const date = isOnline ? null : String(body.date ?? "").trim();
   const slot = isOnline ? null : String(body.slot ?? "").trim();
   if (!isOnline && !isValidDate(date)) return NextResponse.json({ error: "Data non valida." }, { status: 400 });
-  if (!isOnline && !slot) return NextResponse.json({ error: "Orario mancante." }, { status: 400 });
+  if (!isOnline || service.workshop) {
+    if (!isOnline && !slot) return NextResponse.json({ error: "Orario mancante." }, { status: 400 });
+  }
 
   let workshop: { id: string; name: string; email: string | null; city: string | null } | null = null;
   if (!isOnline) {
     const workshopId = String(body.workshopId ?? "").trim();
     if (!workshopId) return NextResponse.json({ error: "Seleziona un'officina." }, { status: 400 });
 
-    const db = createServiceClient();
     const { data, error } = await db
       .from("workshops")
       .select("id,name,email,city,active")
@@ -87,16 +78,12 @@ export async function POST(request: Request) {
     if (bookedError) return NextResponse.json({ error: bookedError.message }, { status: 400 });
 
     const requestedSlotTime = (slot ?? "").slice(0, 5);
-    if ((booked ?? []).some((booking) => {
-      if (!booking.inspection_date) return false;
-      return String(booking.inspection_date).slice(11, 16) === requestedSlotTime;
-    })) {
+    if ((booked ?? []).some((booking) => booking.inspection_date && String(booking.inspection_date).slice(11, 16) === requestedSlotTime)) {
       return NextResponse.json({ error: "Lo slot selezionato non è più disponibile. Aggiorna gli orari e riprova." }, { status: 409 });
     }
   }
 
   const wantsFreeBooking = requestedFreeBooking && Boolean(workshop) && workshop!.name.toLowerCase().includes("autogerma");
-  const db = createServiceClient();
 
   if (wantsFreeBooking) {
     const { data: bonus, error: bonusError } = await db
@@ -107,9 +94,7 @@ export async function POST(request: Request) {
     if (bonusError) return NextResponse.json({ error: "Impossibile verificare il bonus gratuito." }, { status: 500 });
 
     const freeBookings = Number(bonus?.free_bookings ?? 0);
-    if (freeBookings < 1) {
-      return NextResponse.json({ error: "Il bonus per la prenotazione gratuita non è più disponibile." }, { status: 409 });
-    }
+    if (freeBookings < 1) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita non è più disponibile." }, { status: 409 });
 
     const { data: updatedBonus, error: updateBonusError } = await db
       .from("customer_bonus")
@@ -118,9 +103,7 @@ export async function POST(request: Request) {
       .eq("free_bookings", freeBookings)
       .select("free_bookings")
       .maybeSingle();
-    if (updateBonusError || !updatedBonus) {
-      return NextResponse.json({ error: "Il bonus per la prenotazione gratuita è stato usato da un'altra richiesta. Riprova." }, { status: 409 });
-    }
+    if (updateBonusError || !updatedBonus) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita è stato usato da un'altra richiesta. Riprova." }, { status: 409 });
   }
 
   const inspectionDate = isOnline ? null : `${date}T${slot}:00`;
@@ -167,10 +150,5 @@ export async function POST(request: Request) {
     urgency,
   });
 
-  return NextResponse.json({
-    bookingId: data.id,
-    practiceNumber: data.booking_code ?? null,
-    service: service.key,
-    freeBooking: wantsFreeBooking,
-  });
+  return NextResponse.json({ bookingId: data.id, practiceNumber: data.booking_code ?? null, service: service.key, freeBooking: wantsFreeBooking });
 }
