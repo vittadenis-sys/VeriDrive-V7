@@ -21,10 +21,9 @@ export function BookingForm(){
   const selectedWorkshopData=workshops.find((workshop)=>workshop.id===selectedWorkshop) ?? null;
   const isAutogerma=selectedWorkshopData?.display_name?.toLowerCase().includes("autogerma") ?? false;
   const hasFreeAutogermaBooking=Boolean(selected.workshop && isAutogerma && autogermaBonus>0);
-  const price=useMemo(()=>{
-    const base=hasFreeAutogermaBooking?0:selected.priceCents;
-    return (base+(urgency?2500:0))/100;
-  },[selected.priceCents,hasFreeAutogermaBooking,urgency]);
+  const normalPriceCents=selected.priceCents+(urgency?2500:0);
+  const displayPriceCents=hasFreeAutogermaBooking?(urgency?2500:0):normalPriceCents;
+  const price=useMemo(()=>displayPriceCents/100,[displayPriceCents]);
   const isOnline=service==="check_online";
   const customerServices=[...new Set([...CUSTOMER_SERVICE_GROUPS.own_car,...CUSTOMER_SERVICE_GROUPS.buying_used])] as ServiceKey[];
 
