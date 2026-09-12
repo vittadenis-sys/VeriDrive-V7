@@ -64,13 +64,20 @@ export async function POST(request: Request) {
     const db = createServiceClient();
     const { data: booked, error: bookedError } = await db
       .from("bookings")
-      .select("id")
+      .select("id,inspection_date")
       .eq("workshop_id", workshopId)
-      .eq("requested_date", date)
-      .eq("slot", slot)
+      .gte("inspection_date", `${date}T00:00:00`)
+      .lte("inspection_date", `${date}T23:59:59`)
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
     if (bookedError) return NextResponse.json({ error: bookedError.message }, { status: 400 });
-    if ((booked ?? []).length) return NextResponse.json({ error: "Lo slot selezionato non è più disponibile. Aggiorna gli orari e riprova." }, { status: 409 });
+    const requestedSlotTime = slot.length === 5 ? slot : slot.slice(0, 5);
+    if ((booked ?? []).some((booking) => {
+      if (!booking.inspection_date) return false;
+      const value = String(booking.inspection_date);
+      return value.slice(11, 16) === requestedSlotTime;
+    })) {
+      return NextResponse.json({ error: "Lo slot selezionato non è più disponibile. Aggiorna gli orari e riprova." }, { status: 409 });
+    }
   }
 
   const wantsFreeBooking = requestedFreeBooking && Boolean(workshop) && workshop!.name.toLowerCase().includes("autogerma");
@@ -98,24 +105,22 @@ export async function POST(request: Request) {
     }
   }
 
+  const inspectionDate = isOnline ? null : `${date}T${slot}`;
   const insertPayload = {
     customer_id: customer.id,
     workshop_id: workshop?.id ?? null,
     plate: referenceType === "plate" ? reference : "DA-LINK",
     vehicle_make: body.make ? String(body.make).trim() : null,
     vehicle_model: body.model ? String(body.model).trim() : null,
-    requested_date: date,
-    slot,
+    inspection_date: inspectionDate,
     location,
     listing_url: referenceType === "listing" ? reference : null,
-    service_key: serviceKey,
-    customer_price_cents: wantsFreeBooking ? 0 : customerPriceCents,
-    urgency,
-    urgency_price_cents: urgency ? 2500 : 0,
-    paid_with_autogerma_bonus: wantsFreeBooking,
+    service: serviceKey,
+    total: wantsFreeBooking ? 0 : customerPriceCents,
+    status: "requested",
   };
 
-  const { data, error } = await supabase.from("bookings").insert(insertPayload).select("id").single();
+  const { data, error } = await supabase.from("bookings").insert(insertPayload).select("id,booking_code").single();
   if (error) {
     if (wantsFreeBooking) {
       const db = createServiceClient();
@@ -143,5 +148,5 @@ export async function POST(request: Request) {
     urgency,
   });
 
-  return NextResponse.json({ bookingId: data.id, practiceNumber: null, service: service.key, freeBooking: wantsFreeBooking });
+  return NextResponse.json({ bookingId: data.id, practiceNumber: data.booking_code ?? null, service: service.key, freeBooking: wantsFreeBooking });
 }
