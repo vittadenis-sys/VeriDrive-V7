@@ -29,15 +29,19 @@ export async function requireAdmin() {
 
 export async function requireWorkshopOwner() {
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
   if (authError || !user) throw new Error("Unauthorized");
 
-  // Workshop ownership is server-authoritative. Use the service client here so
-  // the authorization lookup is not blocked by workshop RLS policies.
+  // Ownership is resolved server-side with the service client so workshop RLS
+  // policies cannot interfere with the authorization lookup.
   const db = createServiceClient();
   const { data: workshop, error } = await db
     .from("workshops")
-    .select("id,owner_auth_id,active")
+    .select("id")
     .eq("owner_auth_id", user.id)
     .eq("active", true)
     .maybeSingle();
@@ -46,6 +50,9 @@ export async function requireWorkshopOwner() {
     throw new Error(`Workshop lookup failed: ${error.message}`);
   }
 
-  if (!workshop) throw new Error("Workshop owner required");
+  if (!workshop) {
+    throw new Error("Workshop owner required");
+  }
+
   return user;
 }
