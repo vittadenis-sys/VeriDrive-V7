@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   if (!isOnline && !slot) return NextResponse.json({ error: "Orario mancante." }, { status: 400 });
   if (service.workshop && !location) return NextResponse.json({ error: "Indica dove si trova l'auto." }, { status: 400 });
 
-  let workshop: { id: string; name: string; email: string; city: string | null } | null = null;
+  let workshop: { id: string; name: string; email: string | null; city: string | null } | null = null;
   if (!isOnline) {
     const workshopId = String(body.workshopId ?? "").trim();
     if (!workshopId) return NextResponse.json({ error: "Seleziona un'officina." }, { status: 400 });
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       .lte("inspection_date", `${date}T23:59:59`)
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
     if (bookedError) return NextResponse.json({ error: bookedError.message }, { status: 400 });
-    const requestedSlotTime = slot.length === 5 ? slot : slot.slice(0, 5);
+    const requestedSlotTime = slot.slice(0, 5);
     if ((booked ?? []).some((booking) => {
       if (!booking.inspection_date) return false;
       const value = String(booking.inspection_date);
