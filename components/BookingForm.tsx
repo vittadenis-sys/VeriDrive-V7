@@ -28,7 +28,7 @@ export function BookingForm(){
   const customerServices=[...new Set([...CUSTOMER_SERVICE_GROUPS.own_car,...CUSTOMER_SERVICE_GROUPS.buying_used])] as ServiceKey[];
 
   useEffect(()=>{
-    void fetch("/api/customer/bookings",{cache:"no-store"})
+    void fetch("/api/customer/bookings",{cache:"no-store",credentials:"include"})
       .then(async response=>{ if(!response.ok){setBonusLoaded(true);return;} const data=await response.json(); setAutogermaBonus(Number(data.customer?.autogerma_free_booking_bonus ?? data.customer?.free_bookings ?? 0)); setBonusLoaded(true); })
       .catch(()=>setBonusLoaded(true));
   },[]);
@@ -37,7 +37,7 @@ export function BookingForm(){
     if(!nextDate||VERIDRIVE_SERVICES[nextService].workshop===false){setWorkshops([]);setSelectedWorkshop("");return;}
     setLoadingSlots(true); setMessage("");
     try{
-      const response=await fetch(`/api/bookings/availability?service=${encodeURIComponent(nextService)}&date=${encodeURIComponent(nextDate)}&urgency=${nextUrgency}`,{cache:"no-store"});
+      const response=await fetch(`/api/bookings/availability?service=${encodeURIComponent(nextService)}&date=${encodeURIComponent(nextDate)}&urgency=${nextUrgency}`,{cache:"no-store",credentials:"include"});
       const data=await response.json(); if(!response.ok) throw new Error(data.error||"Disponibilità non disponibile.");
       const nextWorkshops:Workshop[]=(data.workshops??[]).map((workshop:Workshop)=>({
         id:workshop.id,
@@ -65,9 +65,9 @@ export function BookingForm(){
       if(!reference){setMessage(referenceType==="plate"?"Inserisci la targa.":"Incolla il link dell'annuncio.");return;}
       if(!isOnline&&(!date||!slot||!selectedWorkshop)){setMessage("Seleziona officina, data e orario.");return;}
       const useFreeBooking=hasFreeAutogermaBooking;
-      const response=await fetch("/api/bookings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({service,referenceType,plate:referenceType==="plate"?reference:null,listingUrl:referenceType==="listing"?reference:null,make:form.get("make"),model:form.get("model"),date:isOnline?null:date,slot:isOnline?null:slot,location:isOnline?null:location,urgency:isOnline?false:urgency,workshopId:isOnline?null:selectedWorkshop,useFreeBooking})});
+      const response=await fetch("/api/bookings",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({service,referenceType,plate:referenceType==="plate"?reference:null,listingUrl:referenceType==="listing"?reference:null,make:form.get("make"),model:form.get("model"),date:isOnline?null:date,slot:isOnline?null:slot,location:isOnline?null:location,urgency:isOnline?false:urgency,workshopId:isOnline?null:selectedWorkshop,useFreeBooking})});
       const data=await response.json(); if(!response.ok){setMessage(data.error||"Impossibile creare la prenotazione.");return;}
-      const checkoutResponse=await fetch("/api/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bookingId:data.bookingId})});
+      const checkoutResponse=await fetch("/api/checkout",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({bookingId:data.bookingId})});
       const checkout=await checkoutResponse.json(); if(!checkoutResponse.ok){setMessage(checkout.error||"Impossibile completare la prenotazione.");return;}
       if(checkout.demo || checkout.freeBooking){
         setAutogermaBonus((current)=>checkout.freeBooking?Math.max(0,current-1):current);
