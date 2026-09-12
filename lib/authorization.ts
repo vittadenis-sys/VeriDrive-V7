@@ -36,14 +36,16 @@ export async function requireWorkshopOwner() {
 
   if (authError || !user) throw new Error("Unauthorized");
 
-  // Ownership is resolved server-side with the service client so workshop RLS
-  // policies cannot interfere with the authorization lookup.
   const db = createServiceClient();
+
+  // Resolve the workshop using the schema actually used by VeriDrive:
+  // ownership is linked by owner_auth_id. Do not add/assume a different
+  // workshop owner column here.
   const { data: workshop, error } = await db
     .from("workshops")
-    .select("id")
+    .select("id,owner_auth_id,is_active")
     .eq("owner_auth_id", user.id)
-    .eq("active", true)
+    .eq("is_active", true)
     .maybeSingle();
 
   if (error) {
