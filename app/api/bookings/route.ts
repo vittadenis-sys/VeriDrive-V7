@@ -70,6 +70,7 @@ export async function POST(request: Request) {
       .lte("inspection_date", `${date}T23:59:59`)
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
     if (bookedError) return NextResponse.json({ error: bookedError.message }, { status: 400 });
+    if (!slot) return NextResponse.json({ error: "Orario mancante." }, { status: 400 });
     const requestedSlotTime = slot.slice(0, 5);
     if ((booked ?? []).some((booking) => {
       if (!booking.inspection_date) return false;
