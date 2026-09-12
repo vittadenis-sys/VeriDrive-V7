@@ -9,9 +9,9 @@ type Env = {
   SUPABASE_PUBLISHABLE_KEY?: string;
 };
 
-function readRuntimeEnv(): Env {
+async function readRuntimeEnv(): Promise<Env> {
   try {
-    const context = getCloudflareContext({ async: true });
+    const context = await getCloudflareContext({ async: true });
     return (context?.env ?? {}) as unknown as Env;
   } catch {
     return {};
