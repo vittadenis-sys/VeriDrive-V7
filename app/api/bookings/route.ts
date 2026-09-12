@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const { data: customer, error: customerError } = await supabase.from("customers").select("id,full_name,phone").eq("auth_id", user.id).single();
   if (customerError || !customer) return NextResponse.json({ error: "Profilo cliente non disponibile." }, { status: 400 });
 
-  const serviceKey = String(body.service ?? "") as ServiceKey;
+  const serviceKey = String(body.service ?? body.service_key ?? "") as ServiceKey;
   if (!SERVICE_KEYS.includes(serviceKey) || !getService(serviceKey)) return NextResponse.json({ error: "Servizio non valido." }, { status: 400 });
 
   const service = getService(serviceKey)!;
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const inspectionDate = isOnline ? null : `${date}T${slot}`;
+  const inspectionDate = isOnline ? null : `${date}T${slot}:00`;
   const insertPayload = {
     customer_id: customer.id,
     workshop_id: workshop?.id ?? null,
@@ -114,7 +114,6 @@ export async function POST(request: Request) {
     vehicle_make: body.make ? String(body.make).trim() : null,
     vehicle_model: body.model ? String(body.model).trim() : null,
     inspection_date: inspectionDate,
-    location,
     service: serviceKey,
     total: wantsFreeBooking ? 0 : customerPriceCents,
     status: "requested",
