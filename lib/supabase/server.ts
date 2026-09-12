@@ -2,10 +2,17 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-function readRuntimeEnv(): Record<string, string | undefined> {
+type Env = {
+  NEXT_PUBLIC_SUPABASE_URL?: string;
+  SUPABASE_URL?: string;
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
+};
+
+function readRuntimeEnv(): Env {
   try {
-    const context = getCloudflareContext();
-    return (context?.env ?? {}) as unknown as Record<string, string | undefined>;
+    const context = getCloudflareContext({ async: true });
+    return (context?.env ?? {}) as unknown as Env;
   } catch {
     return {};
   }
@@ -13,8 +20,8 @@ function readRuntimeEnv(): Record<string, string | undefined> {
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const runtimeEnv = readRuntimeEnv();
-  const processEnv = process.env as Record<string, string | undefined>;
+  const runtimeEnv = await readRuntimeEnv();
+  const processEnv = process.env as Env;
 
   const url =
     processEnv.NEXT_PUBLIC_SUPABASE_URL ||
