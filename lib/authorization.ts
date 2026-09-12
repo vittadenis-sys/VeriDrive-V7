@@ -38,9 +38,8 @@ export async function requireWorkshopOwner() {
 
   const db = createServiceClient();
 
-  // Resolve the workshop using the schema actually used by VeriDrive:
-  // ownership is linked by owner_auth_id. Do not add/assume a different
-  // workshop owner column here.
+  // Workshop ownership is stored on public.workshops.owner_auth_id.
+  // Use the service client so the ownership lookup is not affected by RLS.
   const { data: workshop, error } = await db
     .from("workshops")
     .select("id,owner_auth_id,is_active")
