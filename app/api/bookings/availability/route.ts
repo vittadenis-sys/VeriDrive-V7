@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   for (const workshop of workshops ?? []) {
     const { data: booked, error: bookedError } = await db
       .from("bookings")
-      .select("requested_slot")
+      .select("slot")
       .eq("workshop_id", workshop.id)
       .eq("requested_date", date)
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: bookedError.message, code: bookedError.code }, { status: 400 });
     }
 
-    const busy = new Set((booked ?? []).map((booking) => booking.requested_slot).filter(Boolean));
+    const busy = new Set((booked ?? []).map((booking) => booking.slot).filter(Boolean));
     const availableSlots = SLOT_TIMES.filter((slot) => !busy.has(slot));
     if (!availableSlots.length) continue;
 
