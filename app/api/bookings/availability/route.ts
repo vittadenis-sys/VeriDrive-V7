@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { getCustomerPriceCents, getService, type ServiceKey } from "@/lib/services";
+import { createServiceClient } from "@/lib/supabase/service";
 
 const SERVICE_KEYS: ServiceKey[] = ["check_viaggio", "veriscore", "check_online", "veriscore_plus"];
 const SLOT_TIMES = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"];
@@ -12,7 +12,6 @@ function isValidDate(value: unknown) {
 }
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
   const url = new URL(request.url);
   const serviceKey = String(url.searchParams.get("service") ?? "") as ServiceKey;
   const date = String(url.searchParams.get("date") ?? "").trim();
@@ -40,19 +39,20 @@ export async function GET(request: Request) {
     }, { status: 400 });
   }
 
-  const { data: workshops, error: workshopError } = await supabase
+  const db = createServiceClient();
+  const { data: workshops, error: workshopError } = await db
     .from("workshops")
     .select("id,name,city,address,cap,lat,lng,active")
     .eq("active", true)
     .order("city", { ascending: true });
 
   if (workshopError) {
-    return NextResponse.json({ error: workshopError.message }, { status: 400 });
+    return NextResponse.json({ error: workshopError.message, code: workshopError.code }, { status: 400 });
   }
 
   const results = [];
   for (const workshop of workshops ?? []) {
-    const { data: booked, error: bookedError } = await supabase
+    const { data: booked, error: bookedError } = await db
       .from("bookings")
       .select("requested_slot")
       .eq("workshop_id", workshop.id)
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
 
     if (bookedError) {
-      return NextResponse.json({ error: bookedError.message }, { status: 400 });
+      return NextResponse.json({ error: bookedError.message, code: bookedError.code }, { status: 400 });
     }
 
     const busy = new Set((booked ?? []).map((booking) => booking.requested_slot).filter(Boolean));
@@ -68,7 +68,14 @@ export async function GET(request: Request) {
     if (!availableSlots.length) continue;
 
     results.push({
-      ...workshop,
+      id: workshop.id,
+      name: workshop.name,
+      city: workshop.city ?? null,
+      address: workshop.address ?? null,
+      cap: workshop.cap ?? null,
+      lat: workshop.lat ?? null,
+      lng: workshop.lng ?? null,
+      active: workshop.active,
       display_name: workshop.city
         ? `VeriDrive ${workshop.city} — ${workshop.name}`
         : `VeriDrive — ${workshop.name}`,
