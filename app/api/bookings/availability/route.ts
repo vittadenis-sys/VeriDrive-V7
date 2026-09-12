@@ -11,6 +11,15 @@ function isValidDate(value: unknown) {
   return !Number.isNaN(parsed.getTime());
 }
 
+function slotFromInspectionDate(value: unknown) {
+  if (!value) return null;
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return null;
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const serviceKey = String(url.searchParams.get("service") ?? "") as ServiceKey;
@@ -52,18 +61,21 @@ export async function GET(request: Request) {
 
   const results = [];
   for (const workshop of workshops ?? []) {
+    const start = `${date}T00:00:00`;
+    const end = `${date}T23:59:59`;
     const { data: booked, error: bookedError } = await db
       .from("bookings")
-      .select("slot")
+      .select("inspection_date")
       .eq("workshop_id", workshop.id)
-      .eq("requested_date", date)
+      .gte("inspection_date", start)
+      .lte("inspection_date", end)
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
 
     if (bookedError) {
       return NextResponse.json({ error: bookedError.message, code: bookedError.code }, { status: 400 });
     }
 
-    const busy = new Set((booked ?? []).map((booking) => booking.slot).filter(Boolean));
+    const busy = new Set((booked ?? []).map((booking) => slotFromInspectionDate(booking.inspection_date)).filter(Boolean));
     const availableSlots = SLOT_TIMES.filter((slot) => !busy.has(slot));
     if (!availableSlots.length) continue;
 
