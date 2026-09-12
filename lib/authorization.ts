@@ -38,11 +38,13 @@ export async function requireWorkshopOwner() {
 
   const db = createServiceClient();
 
+  // The live workshops table now contains owner_auth_id. Do not rely on
+  // is_active here: the owner relationship is enough for authorization and
+  // keeps this guard compatible with the current production schema.
   const { data: workshop, error } = await db
     .from("workshops")
-    .select("id,owner_auth_id,is_active")
+    .select("id,owner_auth_id")
     .eq("owner_auth_id", user.id)
-    .eq("is_active", true)
     .maybeSingle();
 
   if (error) {
