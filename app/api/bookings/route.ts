@@ -115,7 +115,6 @@ export async function POST(request: Request) {
     vehicle_model: body.model ? String(body.model).trim() : null,
     inspection_date: inspectionDate,
     location,
-    listing_url: referenceType === "listing" ? reference : null,
     service: serviceKey,
     total: wantsFreeBooking ? 0 : customerPriceCents,
     status: "requested",
