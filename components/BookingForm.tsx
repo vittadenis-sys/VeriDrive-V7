@@ -20,14 +20,17 @@ export function BookingForm(){
   const selected=VERIDRIVE_SERVICES[service];
   const selectedWorkshopData=workshops.find((workshop)=>workshop.id===selectedWorkshop) ?? null;
   const isAutogerma=selectedWorkshopData?.display_name?.toLowerCase().includes("autogerma") ?? false;
-  const hasFreeAutogermaBooking=!selected.workshop || !isAutogerma ? false : autogermaBonus>0;
-  const price=useMemo(()=>(selected.priceCents+(urgency?2500:0))/100,[selected.priceCents,urgency]);
+  const hasFreeAutogermaBooking=Boolean(selected.workshop && isAutogerma && autogermaBonus>0);
+  const price=useMemo(()=>{
+    const base=hasFreeAutogermaBooking?0:selected.priceCents;
+    return (base+(urgency?2500:0))/100;
+  },[selected.priceCents,hasFreeAutogermaBooking,urgency]);
   const isOnline=service==="check_online";
   const customerServices=[...new Set([...CUSTOMER_SERVICE_GROUPS.own_car,...CUSTOMER_SERVICE_GROUPS.buying_used])] as ServiceKey[];
 
   useEffect(()=>{
     void fetch("/api/customer/bookings",{cache:"no-store"})
-      .then(async response=>{ if(!response.ok){setBonusLoaded(true);return;} const data=await response.json(); setAutogermaBonus(Number(data.customer?.autogerma_free_booking_bonus ?? 0)); setBonusLoaded(true); })
+      .then(async response=>{ if(!response.ok){setBonusLoaded(true);return;} const data=await response.json(); setAutogermaBonus(Number(data.customer?.autogerma_free_booking_bonus ?? data.customer?.free_bookings ?? 0)); setBonusLoaded(true); })
       .catch(()=>setBonusLoaded(true));
   },[]);
 
@@ -89,7 +92,7 @@ export function BookingForm(){
       <label className="full">Officina e slot{loadingSlots?<span>Ricerca disponibilità…</span>:workshops.length===0?<span className="notice" style={{marginTop:0}}>Nessuna officina disponibile per la data selezionata.</span>:<div style={{display:"grid",gap:10}}>{workshops.map(workshop=><div key={workshop.id} className={`card ${selectedWorkshop===workshop.id?"selected-option":""}`} style={{padding:14}}><button type="button" className="button secondary" style={{width:"100%",justifyContent:"space-between"}} onClick={()=>{setSelectedWorkshop(workshop.id);setSlot("");}}><span style={{textAlign:"left"}}><b>{workshop.display_name}</b><small style={{display:"block",marginTop:4,opacity:.75}}>{[workshop.address,workshop.city].filter(Boolean).join(" · ")}</small></span><span>Seleziona</span></button>{selectedWorkshop===workshop.id&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>{workshop.availableSlots.map(item=><button key={item} type="button" className={`button ${slot===item?"":"secondary"}`} onClick={()=>setSlot(item)}>{item}</button>)}</div>}</div>)}</div>}</label>
       <label className="full" style={{display:"flex",gap:12,alignItems:"center"}}><input name="urgency" type="checkbox" checked={urgency} onChange={e=>{setUrgency(e.target.checked);}} style={{width:22,height:22}}/><span><b>Urgenza +25 €</b><br/><small>Disponibilità tra 24 e 48 ore, quando presente.</small></span></label>
     </>}
-    <div className="full panel" style={{marginTop:8}}><p><b>Totale: €{price.toFixed(2).replace('.',',')}</b></p><p style={{marginBottom:0}}>{isOnline?"Nessun appuntamento: il servizio viene preso in carico online dopo il pagamento.":"Gli appuntamenti standard richiedono almeno 48 ore di preavviso. Puoi spostarli una sola volta, gratuitamente, almeno 24 ore prima."}</p></div>
+    <div className="full panel" style={{marginTop:8}}><p><b>{hasFreeAutogermaBooking?`Prenotazione gratuita Autogerma${urgency?" + €25 urgenza":""}`:`Totale: €${price.toFixed(2).replace('.',',')}`}</b></p><p style={{marginBottom:0}}>{isOnline?"Nessun appuntamento: il servizio viene preso in carico online dopo il pagamento.":"Gli appuntamenti standard richiedono almeno 48 ore di preavviso. Puoi spostarli una sola volta, gratuitamente, almeno 24 ore prima."}</p></div>
     {selected.certificate&&<div className="full panel" style={{marginTop:0}}><p style={{marginBottom:4}}><b>Certificato VeriDrive incluso</b></p><p style={{marginBottom:0}}>VeriScore, risultato della verifica, certificato digitale e QR pubblico di verifica.</p></div>}
     {selected.photos&&<div className="full panel" style={{marginTop:0}}><p style={{marginBottom:4}}><b>VeriScorePlus</b></p><p style={{marginBottom:0}}>Foto solamente dei difetti riscontrati e stima indicativa dei costi di riparazione.</p></div>}
     {hasFreeAutogermaBooking&&<div className="full notice" style={{marginTop:0}}>Prenotazione gratuita Autogerma disponibile.</div>}
