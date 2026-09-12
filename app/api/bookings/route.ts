@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
     if (bookedError) return NextResponse.json({ error: bookedError.message }, { status: 400 });
 
-    const requestedSlotTime = slot.slice(0, 5);
+    const requestedSlotTime = String(slot ?? "").slice(0, 5);
     if ((booked ?? []).some((booking) => {
       if (!booking.inspection_date) return false;
       return String(booking.inspection_date).slice(11, 16) === requestedSlotTime;
@@ -106,9 +106,6 @@ export async function POST(request: Request) {
   const insertPayload = {
     customer_id: customer.id,
     workshop_id: workshop?.id ?? null,
-    plate: referenceType === "plate" ? reference : "DA-LINK",
-    vehicle_make: body.make ? String(body.make).trim() : null,
-    vehicle_model: body.model ? String(body.model).trim() : null,
     inspection_date: inspectionDate,
     service: serviceKey,
     total: wantsFreeBooking ? 0 : customerPriceCents,
@@ -129,9 +126,9 @@ export async function POST(request: Request) {
   await sendBookingConfirmation(user.email ?? "", data.id);
   await sendBookingOperationalNotifications({
     id: data.id,
-    plate: insertPayload.plate,
-    vehicleMake: insertPayload.vehicle_make,
-    vehicleModel: insertPayload.vehicle_model,
+    plate: "",
+    vehicleMake: null,
+    vehicleModel: null,
     service: service.name,
     customerEmail: user.email,
     workshopEmail: workshop?.email ?? null,
