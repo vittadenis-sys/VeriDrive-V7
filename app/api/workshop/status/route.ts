@@ -38,6 +38,12 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Pratica non trovata." }, { status: 404 });
     }
 
+    // Idempotenza: completare una pratica già completata non deve essere trattato
+    // come un errore, perché la checklist di chiusura può essere ritentata.
+    if (booking.status === toStatus) {
+      return NextResponse.json({ ok: true, status: booking.status });
+    }
+
     const allowedTransitions: Record<string, string[]> = {
       requested: ["confirmed"],
       assigned: ["confirmed"],
