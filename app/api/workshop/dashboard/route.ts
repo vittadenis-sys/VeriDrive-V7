@@ -5,33 +5,57 @@ import { createServiceClient } from "@/lib/supabase/service";
 export async function GET() {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Sessione non disponibile." }, { status: 401 });
     }
 
     const db = createServiceClient();
-    const { data: workshop, error: workshopError } = await db
-      .from("workshops")
-      .select("id,name,city,address,postal_code")
-      .eq("owner_auth_id", user.id)
+
+    const { data: admin } = await db
+      .from("admins")
+      .select("role")
+      .eq("auth_id", user.id)
       .maybeSingle();
 
-    if (workshopError) throw workshopError;
+    const isAdmin = !!admin && ["admin", "super_admin"].includes(admin.role);
+
+    const workshopQuery = db
+      .from("workshops")
+      .select("id,name,city,address,cap,lat,lng,active,owner_auth_id");
+
+    const { data: workshop, error: workshopError } = isAdmin
+      ? await workshopQuery.order("name", { ascending: true }).limit(1).maybeSingle()
+      : await workshopQuery.eq("owner_auth_id", user.id).maybeSingle();
+
+    if (workshopError) {
+      return NextResponse.json({ error: workshopError.message }, { status: 500 });
+    }
+
     if (!workshop) {
       return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
     }
 
     const { data: bookings, error: bookingsError } = await db
       .from("bookings")
-      .select("id,booking_code,customer_id,vehicle_id,workshop_id,plate,vehicle_make,vehicle_model,vehicle_year,requested_date,requested_slot,status,service_key,urgency,customer_price_cents,created_at,updated_at")
+      .select("id,booking_code,customer_id,vehicle_id,workshop_id,service,status,inspection_date,total,travel_km,overall_notes,created_at,updated_at")
       .eq("workshop_id", workshop.id)
-      .order("requested_date", { ascending: true, nullsFirst: false });
+      .order("inspection_date", { ascending: true, nullsFirst: false });
 
-    if (bookingsError) throw bookingsError;
+    if (bookingsError) {
+      return NextResponse.json({ error: bookingsError.message }, { status: 500 });
+    }
 
-    const customerIds = (bookings ?? []).map((booking) => booking.customer_id).filter(Boolean);
-    const vehicleIds = (bookings ?? []).map((booking) => booking.vehicle_id).filter(Boolean);
+    const customerIds = (bookings ?? [])
+      .map((booking) => booking.customer_id)
+      .filter((id): id is string => Boolean(id));
+    const vehicleIds = (bookings ?? [])
+      .map((booking) => booking.vehicle_id)
+      .filter((id): id is string => Boolean(id));
 
     const [{ data: customers, error: customersError }, { data: vehicles, error: vehiclesError }] = await Promise.all([
       customerIds.length
@@ -42,8 +66,12 @@ export async function GET() {
         : Promise.resolve({ data: [], error: null }),
     ]);
 
-    if (customersError) throw customersError;
-    if (vehiclesError) throw vehiclesError;
+    if (customersError) {
+      return NextResponse.json({ error: customersError.message }, { status: 500 });
+    }
+    if (vehiclesError) {
+      return NextResponse.json({ error: vehiclesError.message }, { status: 500 });
+    }
 
     const customerById = new Map((customers ?? []).map((customer) => [customer.id, customer]));
     const vehicleById = new Map((vehicles ?? []).map((vehicle) => [vehicle.id, vehicle]));
@@ -55,9 +83,16 @@ export async function GET() {
       payout: null,
     }));
 
-    return NextResponse.json({ workshop, bookings: enriched, isSuperAdmin: false });
+    return NextResponse.json({
+      workshop,
+      bookings: enriched,
+      isSuperAdmin: admin?.role === "super_admin",
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Non autorizzato";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("WORKSHOP_DASHBOARD_ERROR", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Errore interno." },
+      { status: 500 }
+    );
   }
 }
