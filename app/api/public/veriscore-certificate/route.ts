@@ -26,23 +26,21 @@ export async function GET(request: Request) {
       .eq("public_code", code)
       .maybeSingle();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: error.message, code: error.code, hint: error.hint }, { status: 500 });
     if (!data) return NextResponse.json({ error: "Certificato non trovato." }, { status: 404 });
 
     const { data: workshop } = await db.from("workshops").select("name").eq("id", data.workshop_id).maybeSingle();
-    let service: string | null = null;
-    if (data.booking_id) {
-      const { data: booking } = await db.from("bookings").select("service").eq("id", data.booking_id).maybeSingle();
-      service = booking?.service ?? null;
-    }
+    const { data: booking } = await db.from("bookings").select("service").eq("id", data.booking_id).maybeSingle();
+    const isPlus = booking?.service === "veriscore_plus";
 
     let photos: Array<{ id: string; caption: string | null; check_id: number | null; image_url: string | null }> = [];
-    if (service === "veriscore_plus") {
-      const { data: rows } = await db.from("photos")
+    if (isPlus) {
+      const { data: rows, error: photoError } = await db.from("photos")
         .select("id,storage_path,caption,check_id,created_at")
         .eq("inspection_id", data.booking_id)
         .order("created_at", { ascending: true })
         .limit(10);
+      if (photoError) return NextResponse.json({ error: photoError.message, code: photoError.code, hint: photoError.hint }, { status: 500 });
       photos = await Promise.all((rows ?? []).map(async (photo) => {
         const { data: signed } = await db.storage.from("inspection-photos").createSignedUrl(photo.storage_path, 300);
         return { id: photo.id, caption: photo.caption, check_id: photo.check_id, image_url: signed?.signedUrl ?? null };
@@ -60,8 +58,8 @@ export async function GET(request: Request) {
       veriscore: data.veriscore,
       workshop_name: workshop?.name ?? null,
       issued_at: data.issued_at,
-      service,
-      is_plus: service === "veriscore_plus",
+      service: booking?.service ?? null,
+      is_plus: isPlus,
       photos,
     }});
   } catch (error) {
