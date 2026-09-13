@@ -11,7 +11,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: authError?.message ?? "Sessione non disponibile." }, { status: 401 });
     }
 
-    const db = createServiceClient();
+    const db = await createServiceClient();
     const { data: admin, error: adminError } = await db
       .from("admins")
       .select("auth_id,role")
