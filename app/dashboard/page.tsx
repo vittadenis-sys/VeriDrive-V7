@@ -96,9 +96,7 @@ export default function Dashboard() {
     }
   }
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useEffect(() => { void load(); }, []);
 
   const stats = useMemo(() => {
     const bookings = data?.bookings ?? [];
@@ -136,9 +134,7 @@ export default function Dashboard() {
                 <h2>{message}</h2>
                 <p>La sessione è attiva, ma non è stato possibile caricare i dati cliente.</p>
               </div>
-              <button type="button" className="button" onClick={() => void load()} disabled={loading}>
-                {loading ? "Caricamento…" : "Riprova"}
-              </button>
+              <button type="button" className="button" onClick={() => void load()} disabled={loading}>{loading ? "Caricamento…" : "Riprova"}</button>
             </section>
           )}
 
@@ -155,7 +151,6 @@ export default function Dashboard() {
                   <div><div className="eyebrow">PRATICHE REALI</div><h2>Le tue verifiche</h2></div>
                   <button type="button" className="button secondary" onClick={() => void load()} disabled={loading}>Aggiorna</button>
                 </div>
-
                 {loading && <div className="notice">Caricamento pratiche…</div>}
                 {!loading && data && data.bookings.length === 0 && (
                   <div className="panel customer-info">
@@ -173,17 +168,13 @@ export default function Dashboard() {
                           <div className="customer-check-main">
                             <div className="vehicle-icon"><CalendarDays size={20} /></div>
                             <div>
-                              <strong>{vehicle}</strong>
-                              <span>{booking.practice_code ?? "Pratica"}</span>
-                              <span>{booking.plate}</span>
-                              <span>{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>
-                              <span>{formatDate(booking.requested_date)} {booking.requested_slot ?? ""}</span>
+                              <strong>{vehicle}</strong><span>{booking.practice_code ?? "Pratica"}</span><span>{booking.plate}</span><span>{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span><span>{formatDate(booking.requested_date)} {booking.requested_slot ?? ""}</span>
                               {certificate && <span style={{ marginTop: 4, fontWeight: 700 }}>Certificato {certificate.public_code} · VeriScore {certificate.veriscore}/100 · {formatIssuedAt(certificate.issued_at)}</span>}
                             </div>
                           </div>
                           <div className="customer-check-score">
                             <div className="small-score"><span>Stato</span><strong>{STATUS_LABELS[booking.status] ?? booking.status}</strong><em>{booking.urgency ? "Urgenza" : money(booking.customer_price_cents)}</em></div>
-                            {booking.status === "completed" && <Link className="button secondary" href={`/verifica/${certificate?.public_code ?? booking.id}`}>Apri pratica</Link>}
+                            {booking.status === "completed" && <Link className="button secondary" href={certificate ? `/verifica/${certificate.public_code}` : "/dashboard"}>Apri pratica</Link>}
                           </div>
                         </article>
                       );
@@ -193,15 +184,10 @@ export default function Dashboard() {
               </section>
 
               <section className="dashboard-section" style={{ marginTop: 12 }}>
-                <div className="section-heading">
-                  <div><div className="eyebrow">DOCUMENTI</div><h2>I miei certificati</h2></div>
-                </div>
+                <div className="section-heading"><div><div className="eyebrow">DOCUMENTI</div><h2>I miei certificati</h2></div></div>
                 {loading && <div className="notice">Caricamento certificati…</div>}
                 {!loading && (data?.certificates ?? []).length === 0 && (
-                  <div className="panel customer-info">
-                    <ShieldCheck size={28} />
-                    <div><h3>Nessun certificato ancora</h3><p>Quando una pratica VeriScore viene chiusa, il certificato apparirà automaticamente qui.</p></div>
-                  </div>
+                  <div className="panel customer-info"><ShieldCheck size={28} /><div><h3>Nessun certificato ancora</h3><p>Quando una pratica VeriScore viene chiusa, il certificato apparirà automaticamente qui.</p></div></div>
                 )}
                 {!loading && (data?.certificates ?? []).length > 0 && (
                   <div className="customer-checks">
@@ -217,6 +203,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="customer-check-score">
+                          <img src={`/api/customer/certificates/${encodeURIComponent(certificate.id)}/qr`} alt={`QR certificato ${certificate.public_code}`} width={96} height={96} style={{ display: "block", borderRadius: 8, background: "#fff" }} />
                           <div className="small-score"><span>Targa</span><strong>{certificate.vehicle_plate}</strong><em>VIN {certificate.vehicle_vin}</em></div>
                           <Link className="button secondary" href={`/verifica/${certificate.public_code}`}><ShieldCheck size={17} /> Verifica</Link>
                           <a className="button" href={`/api/customer/certificates/${encodeURIComponent(certificate.id)}/pdf`}><Download size={17} /> Scarica PDF</a>

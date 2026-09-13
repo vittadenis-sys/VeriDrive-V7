@@ -4,10 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 function maskPlate(value: string) {
   const clean = value.trim().toUpperCase();
   if (!clean) return "";
-  return clean
-    .split("")
-    .map((char, index) => (index === 0 || index === 2 || index === clean.length - 1 ? char : "*"))
-    .join("");
+  return clean.split("").map((char, index) => (index === 0 || index === 2 || index === clean.length - 1 ? char : "*")).join("");
 }
 
 function maskVin(value: string) {
@@ -24,7 +21,7 @@ export async function GET(request: Request) {
   const db = createServiceClient();
   const { data, error } = await db
     .from("veriscore_certificates")
-    .select("public_code,vehicle_plate,vehicle_vin,vehicle_make,vehicle_model,vehicle_year,vehicle_mileage,veriscore,workshop_id,issued_at,workshops(name)")
+    .select("id,booking_id,public_code,vehicle_plate,vehicle_vin,vehicle_make,vehicle_model,vehicle_year,vehicle_mileage,veriscore,workshop_id,issued_at,workshops(name)")
     .eq("public_code", code)
     .maybeSingle();
 
@@ -34,6 +31,8 @@ export async function GET(request: Request) {
   const workshop = Array.isArray(data.workshops) ? data.workshops[0] : data.workshops;
   return NextResponse.json({
     certificate: {
+      id: data.id,
+      booking_id: data.booking_id,
       public_code: data.public_code,
       vehicle_plate: maskPlate(data.vehicle_plate),
       vehicle_vin: maskVin(data.vehicle_vin),
