@@ -9,8 +9,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { workshopId, slot } = await request.json() as { workshopId?: string; slot?: string };
     if (!workshopId || !slot) return NextResponse.json({ error: "Officina e slot sono obbligatori." }, { status: 400 });
 
-    const db = createServiceClient();
-    const { data: booking, error: bookingError } = await db.from("bookings").select("id,status,requested_date,requested_slot,service_key,urgency,workshop_id").eq("id", id).single();
+    const db = await createServiceClient();
+    const { data: booking, error: bookingError } = await db
+      .from("bookings")
+      .select("id,status,requested_date,requested_slot,service_key,urgency,workshop_id")
+      .eq("id", id)
+      .single();
     if (bookingError || !booking) return NextResponse.json({ error: "Prenotazione non trovata." }, { status: 404 });
     if (["completed", "cancelled", "refunded"].includes(booking.status)) return NextResponse.json({ error: "La pratica non può più essere assegnata." }, { status: 400 });
 
