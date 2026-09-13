@@ -100,7 +100,7 @@ export async function PUT(request: Request) {
 
     const { data: booking, error: bookingError } = await db
       .from("bookings")
-      .select("id,customer_id,workshop_id,status,service,overall_notes,vehicle_id,practice_code,booking_code")
+      .select("id,customer_id,workshop_id,status,service,overall_notes,vehicle_id,booking_code")
       .eq("id", bookingId)
       .maybeSingle();
     if (bookingError) return NextResponse.json({ error: bookingError.message }, { status: 500 });
@@ -140,10 +140,6 @@ export async function PUT(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
-    // Keep the certificate-producing transition in one controlled server flow.
-    // For a close, the inspection completion is written first; its DB trigger can
-    // then create the registry row. Booking status is set only after the certificate
-    // exists and downstream delivery has succeeded.
     if (body.close && certificateService) {
       const { error: notesError } = await db
         .from("bookings")
@@ -219,7 +215,7 @@ export async function PUT(request: Request) {
 
       const emailResult = await sendCertificateIssuedEmail(authUser.user.email, {
         publicCode: String(certificate.public_code),
-        bookingId: String(booking.practice_code ?? booking.booking_code ?? bookingId),
+        bookingId: String(booking.booking_code ?? bookingId),
         veriscore: Number(certificate.veriscore),
         vehicleMake: certificate.vehicle_make as string | null,
         vehicleModel: certificate.vehicle_model as string | null,
