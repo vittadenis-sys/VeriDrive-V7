@@ -2,13 +2,21 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-const ROUTE_VERSION = "customer-bookings-2026-09-13-v5";
+const ROUTE_VERSION = "customer-bookings-2026-09-13-v6";
 
 function json(data: Record<string, unknown>, status = 200) {
   return NextResponse.json({ routeVersion: ROUTE_VERSION, ...data }, {
     status,
     headers: { "Cache-Control": "no-store, max-age=0", "X-VeriDrive-Route": ROUTE_VERSION },
   });
+}
+
+function getVehicleValue(vehicle: Record<string, unknown> | null, ...keys: string[]) {
+  for (const key of keys) {
+    const value = vehicle?.[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") return value;
+  }
+  return null;
 }
 
 export async function GET() {
@@ -40,6 +48,15 @@ export async function GET() {
       .order("created_at", { ascending: false });
     if (error) return json({ stage: "bookings", error: error.message, code: error.code, details: error.details, hint: error.hint }, 400);
 
+    const vehicleIds = (bookings ?? []).map((booking) => booking.vehicle_id).filter(Boolean);
+    let vehicles: Record<string, unknown>[] = [];
+    if (vehicleIds.length) {
+      const vehicleResult = await db.from("vehicles").select("*").in("id", vehicleIds);
+      if (vehicleResult.error) return json({ stage: "vehicles", error: vehicleResult.error.message, code: vehicleResult.error.code }, 500);
+      vehicles = (vehicleResult.data ?? []) as Record<string, unknown>[];
+    }
+    const vehicleById = new Map(vehicles.map((vehicle) => [String(vehicle.id), vehicle]));
+
     const bookingIds = (bookings ?? []).map((booking) => booking.id).filter(Boolean);
     let certificates: Record<string, unknown>[] = [];
     if (bookingIds.length) {
@@ -54,25 +71,32 @@ export async function GET() {
       certificates = (certificateResult.data ?? []) as Record<string, unknown>[];
     }
 
-    const normalizedBookings = (bookings ?? []).map((booking) => ({
-      id: booking.id ?? null,
-      booking_code: booking.booking_code ?? null,
-      practice_code: booking.booking_code ?? null,
-      plate: "",
-      vehicle_make: null,
-      vehicle_model: null,
-      vehicle_year: null,
-      requested_date: booking.inspection_date ? String(booking.inspection_date).slice(0, 10) : null,
-      requested_slot: booking.inspection_date ? String(booking.inspection_date).slice(11, 16) : null,
-      inspection_date: booking.inspection_date ?? null,
-      status: booking.status ?? "",
-      service_key: booking.service ?? "",
-      urgency: false,
-      customer_price_cents: Number(booking.total ?? 0),
-      workshop_id: booking.workshop_id ?? null,
-      created_at: booking.created_at ?? null,
-      updated_at: booking.created_at ?? null,
-    }));
+    const normalizedBookings = (bookings ?? []).map((booking) => {
+      const vehicle = booking.vehicle_id ? vehicleById.get(String(booking.vehicle_id)) ?? null : null;
+      const plate = String(getVehicleValue(vehicle, "plate", "registration", "license_plate", "targa") ?? "");
+      const make = String(getVehicleValue(vehicle, "make", "brand", "vehicle_make", "marca") ?? "");
+      const model = String(getVehicleValue(vehicle, "model", "vehicle_model", "modello") ?? "");
+      const yearValue = getVehicleValue(vehicle, "year", "vehicle_year", "anno");
+      return {
+        id: booking.id ?? null,
+        booking_code: booking.booking_code ?? null,
+        practice_code: booking.booking_code ?? null,
+        plate,
+        vehicle_make: make || null,
+        vehicle_model: model || null,
+        vehicle_year: yearValue == null ? null : Number(yearValue),
+        requested_date: booking.inspection_date ? String(booking.inspection_date).slice(0, 10) : null,
+        requested_slot: booking.inspection_date ? String(booking.inspection_date).slice(11, 16) : null,
+        inspection_date: booking.inspection_date ?? null,
+        status: booking.status ?? "",
+        service_key: booking.service ?? "",
+        urgency: false,
+        customer_price_cents: Number(booking.total ?? 0),
+        workshop_id: booking.workshop_id ?? null,
+        created_at: booking.created_at ?? null,
+        updated_at: booking.created_at ?? null,
+      };
+    });
 
     return json({
       stage: "done",
