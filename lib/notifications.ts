@@ -7,7 +7,8 @@ function getSender() {
 async function sendEmail({ to, cc, subject, html }: { to: string; cc?: string[]; subject: string; html: string }) {
   if (!process.env.RESEND_API_KEY || !to) return { sent: false, reason: "Email non configurata" };
   const resend = new Resend(process.env.RESEND_API_KEY);
-  await resend.emails.send({ from: getSender(), to, ...(cc?.length ? { cc } : {}), subject, html });
+  const result = await resend.emails.send({ from: getSender(), to, ...(cc?.length ? { cc } : {}), subject, html });
+  if (result.error) return { sent: false, reason: result.error.message };
   return { sent: true };
 }
 
@@ -61,12 +62,8 @@ export async function sendBookingOperationalNotifications(booking: {
   const html = `<h1>Nuova prenotazione VeriDrive</h1><p>Pratica: <b>${booking.id}</b></p><p>Veicolo: <b>${vehicle}</b></p><p>Targa: <b>${booking.plate}</b></p><p>Servizio: <b>${booking.service}</b></p><p>Data: <b>${booking.date ?? "-"}</b></p><p>Ora: <b>${booking.slot ?? "-"}</b></p>${booking.urgency ? "<p><b>Urgenza</b></p>" : ""}`;
 
   const results = [];
-  for (const to of uniqueRecipients) {
-    results.push(await sendEmail({ to, subject, html }));
-  }
-  if (customerEmail) {
-    results.push(await sendEmail({ to: customerEmail, subject: `Ricezione prenotazione VeriDrive ${booking.id}`, html: `<h1>Prenotazione ricevuta</h1><p>La pratica <b>${booking.id}</b> è stata registrata.</p><p>Ti aggiorneremo sulla conferma dell'appuntamento.</p>` }));
-  }
+  for (const to of uniqueRecipients) results.push(await sendEmail({ to, subject, html }));
+  if (customerEmail) results.push(await sendEmail({ to: customerEmail, subject: `Ricezione prenotazione VeriDrive ${booking.id}`, html: `<h1>Prenotazione ricevuta</h1><p>La pratica <b>${booking.id}</b> è stata registrata.</p><p>Ti aggiorneremo sulla conferma dell'appuntamento.</p>` }));
   return results;
 }
 
