@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireWorkshopOwner } from "@/lib/authorization";
 import { createServiceClient } from "@/lib/supabase/service";
 import { calculateWeightedVeriscore } from "@/lib/veriscore";
+import { sendCertificateIssuedEmail } from "@/lib/notifications";
 
 function parseOverallNotes(value: unknown): Record<string, unknown> {
   if (typeof value === "object" && value) return value as Record<string, unknown>;
@@ -34,34 +35,23 @@ export async function GET(request: Request) {
 
     let vehicle: Record<string, unknown> | null = null;
     if (booking.vehicle_id) {
-      const { data: vehicleData, error: vehicleError } = await db
-        .from("vehicles")
-        .select("*")
-        .eq("id", booking.vehicle_id)
-        .maybeSingle();
+      const { data: vehicleData, error: vehicleError } = await db.from("vehicles").select("*").eq("id", booking.vehicle_id).maybeSingle();
       if (vehicleError) return NextResponse.json({ error: vehicleError.message }, { status: 500 });
       vehicle = vehicleData;
     }
 
     const stored = parseOverallNotes(booking.overall_notes);
-    const plate = String(vehicle?.plate ?? vehicle?.registration ?? vehicle?.license_plate ?? "");
-    const make = String(vehicle?.make ?? vehicle?.brand ?? vehicle?.vehicle_make ?? "");
-    const model = String(vehicle?.model ?? vehicle?.vehicle_model ?? "");
-    const year = vehicle?.year ?? vehicle?.vehicle_year ?? null;
-    const vin = String(vehicle?.vin ?? vehicle?.vehicle_vin ?? "");
-    const mileage = vehicle?.mileage ?? vehicle?.vehicle_mileage ?? null;
-
     return NextResponse.json({
       booking: {
         id: booking.id,
         workshop_id: booking.workshop_id,
         service: booking.service,
-        plate,
-        vehicle_make: make || null,
-        vehicle_model: model || null,
-        vehicle_year: year,
-        vin: vin || null,
-        vehicle_mileage: mileage,
+        plate: String(vehicle?.plate ?? vehicle?.registration ?? vehicle?.license_plate ?? ""),
+        vehicle_make: String(vehicle?.make ?? vehicle?.brand ?? vehicle?.vehicle_make ?? "") || null,
+        vehicle_model: String(vehicle?.model ?? vehicle?.vehicle_model ?? "") || null,
+        vehicle_year: vehicle?.year ?? vehicle?.vehicle_year ?? null,
+        vin: String(vehicle?.vin ?? vehicle?.vehicle_vin ?? "") || null,
+        vehicle_mileage: vehicle?.mileage ?? vehicle?.vehicle_mileage ?? null,
       },
       inspection: {
         checklist: Array.isArray(stored.checklist) ? stored.checklist : [],
@@ -85,20 +75,12 @@ export async function PUT(request: Request) {
       checklist?: Array<{ id: number; area: string; label: string; result: "ok" | "issue" | "critical" | null }>;
       notes?: string;
       close?: boolean;
-      vehicle?: {
-        plate?: string;
-        make?: string;
-        model?: string;
-        year?: number | null;
-        vin?: string;
-        mileage?: number | null;
-      };
+      vehicle?: { plate?: string; make?: string; model?: string; year?: number | null; vin?: string; mileage?: number | null };
     };
 
     const bookingId = String(body.bookingId ?? "").trim();
     const checklistResults = Array.isArray(body.checklist) ? body.checklist : [];
     if (!bookingId || checklistResults.length !== 50) return NextResponse.json({ error: "La checklist deve contenere tutti i 50 controlli." }, { status: 400 });
-
     const ids = new Set(checklistResults.map((item) => Number(item.id)));
     if (ids.size !== 50 || [...ids].some((id) => id < 1 || id > 50)) return NextResponse.json({ error: "Checklist non valida." }, { status: 400 });
 
@@ -127,11 +109,7 @@ export async function PUT(request: Request) {
 
     let currentVehicle: Record<string, unknown> = {};
     if (booking.vehicle_id) {
-      const { data: vehicleData, error: vehicleError } = await db
-        .from("vehicles")
-        .select("*")
-        .eq("id", booking.vehicle_id)
-        .maybeSingle();
+      const { data: vehicleData, error: vehicleError } = await db.from("vehicles").select("*").eq("id", booking.vehicle_id).maybeSingle();
       if (vehicleError) return NextResponse.json({ error: vehicleError.message }, { status: 500 });
       currentVehicle = vehicleData ?? {};
     }
@@ -152,22 +130,18 @@ export async function PUT(request: Request) {
     }
 
     const completedAt = body.close ? new Date().toISOString() : previousNotes.completed_at ?? null;
-    const updatePayload: Record<string, unknown> = {
-      overall_notes: JSON.stringify({
-        ...previousNotes,
-        checklist: checklistResults,
-        checklist_notes: String(body.notes ?? "").trim() || null,
-        passed_checks: passedChecks,
-        completed_checks: completedChecks,
-        veriscore,
-        completed_at: completedAt,
-      }),
-      status: body.close ? "completed" : booking.status,
-    };
+    const notesPayload = JSON.stringify({
+      ...previousNotes,
+      checklist: checklistResults,
+      checklist_notes: String(body.notes ?? "").trim() || null,
+      passed_checks: passedChecks,
+      completed_checks: completedChecks,
+      veriscore,
+      completed_at: completedAt,
+    });
 
-    const { error: saveError } = await db
-      .from("bookings")
-      .update(updatePayload)
+    const { error: saveError } = await db.from("bookings")
+      .update({ overall_notes: notesPayload, status: body.close ? "completed" : booking.status })
       .eq("id", bookingId)
       .eq("workshop_id", workshop.id);
     if (saveError) return NextResponse.json({ error: saveError.message }, { status: 400 });
@@ -206,6 +180,28 @@ export async function PUT(request: Request) {
           .single();
         if (certificateError) return NextResponse.json({ error: certificateError.message }, { status: 400 });
         certificate = createdCertificate as Record<string, unknown>;
+      }
+
+      let customerEmail: string | null = null;
+      if (booking.customer_id) {
+        const { data: customer } = await db.from("customers").select("auth_id").eq("id", booking.customer_id).maybeSingle();
+        if (customer?.auth_id) {
+          const { data: authUser } = await db.auth.admin.getUserById(customer.auth_id);
+          customerEmail = authUser.user?.email ?? null;
+        }
+      }
+
+      if (customerEmail && certificate) {
+        const emailResult = await sendCertificateIssuedEmail(customerEmail, {
+          publicCode: String(certificate.public_code),
+          bookingId,
+          veriscore: Number(certificate.veriscore),
+          vehicleMake: certificate.vehicle_make as string | null,
+          vehicleModel: certificate.vehicle_model as string | null,
+        });
+        if (!emailResult.sent) {
+          return NextResponse.json({ error: emailResult.reason ?? "Invio email non riuscito.", certificate }, { status: 502 });
+        }
       }
     }
 
