@@ -24,7 +24,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://veridrive.it";
     const verificationUrl = `${baseUrl}/verifica/${encodeURIComponent(certificate.public_code)}`;
     const png = await QRCode.toBuffer(verificationUrl, { type: "png", width: 400, margin: 1 });
-    return new NextResponse(png, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "private, no-store" } });
+    return new NextResponse(new Uint8Array(png), { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("CUSTOMER_CERTIFICATE_QR_ERROR", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Impossibile generare il QR." }, { status: 500 });
