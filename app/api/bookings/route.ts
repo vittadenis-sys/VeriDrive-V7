@@ -5,11 +5,21 @@ import { getCustomerPriceCents, getService, type ServiceKey } from "@/lib/servic
 import { createServiceClient } from "@/lib/supabase/service";
 
 const SERVICE_KEYS: ServiceKey[] = ["check_viaggio", "veriscore", "check_online", "veriscore_plus"];
+const ACTIVE_BOOKING_STATUSES = ["requested", "assigned", "confirmed", "in_progress"];
 
 function isValidDate(value: unknown) {
   if (typeof value !== "string" || !value) return false;
   const parsed = new Date(`${value}T00:00:00`);
   return !Number.isNaN(parsed.getTime());
+}
+
+function normalizeSlot(value: string) {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 export async function POST(request: Request) {
@@ -40,9 +50,10 @@ export async function POST(request: Request) {
   if (customerPriceCents == null) return NextResponse.json({ error: "Impossibile calcolare il prezzo." }, { status: 400 });
 
   const date = isOnline ? null : String(body.date ?? "").trim();
-  const slot = isOnline ? null : String(body.slot ?? "").trim();
+  const rawSlot = isOnline ? null : String(body.slot ?? "").trim();
+  const slot = rawSlot ? normalizeSlot(rawSlot) : null;
   if (!isOnline && !isValidDate(date)) return NextResponse.json({ error: "Data non valida." }, { status: 400 });
-  if (!isOnline && !slot) return NextResponse.json({ error: "Orario mancante." }, { status: 400 });
+  if (!isOnline && !slot) return NextResponse.json({ error: "Orario non valido." }, { status: 400 });
 
   let workshop: { id: string; name: string; email: string | null; city: string | null } | null = null;
   if (!isOnline) {
@@ -62,18 +73,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "La prenotazione gratuita è disponibile solo presso Autogerma." }, { status: 400 });
     }
 
+    // Prevent booking the same workshop/date/time twice. Use the actual
+    // inspection_date stored by VeriDrive rather than legacy requested_* columns.
+    const dayStart = `${date}T00:00:00`;
+    const dayEnd = `${date}T23:59:59.999`;
     const { data: booked, error: bookedError } = await db
       .from("bookings")
       .select("id,inspection_date")
       .eq("workshop_id", workshopId)
-      .gte("inspection_date", `${date}T00:00:00`)
-      .lte("inspection_date", `${date}T23:59:59`)
-      .in("status", ["requested", "assigned", "confirmed", "in_progress"]);
+      .gte("inspection_date", dayStart)
+      .lte("inspection_date", dayEnd)
+      .in("status", ACTIVE_BOOKING_STATUSES);
+
     if (bookedError) return NextResponse.json({ error: bookedError.message }, { status: 400 });
 
-    const requestedSlotTime = (slot ?? "").slice(0, 5);
-    if ((booked ?? []).some((booking) => booking.inspection_date && String(booking.inspection_date).slice(11, 16) === requestedSlotTime)) {
-      return NextResponse.json({ error: "Lo slot selezionato non è più disponibile. Aggiorna gli orari e riprova." }, { status: 409 });
+    const conflict = (booked ?? []).some((booking) => {
+      if (!booking.inspection_date || !slot) return false;
+      return String(booking.inspection_date).slice(11, 16) === slot;
+    });
+
+    if (conflict) {
+      return NextResponse.json(
+        { error: "Lo slot selezionato non è più disponibile. Scegli un altro orario." },
+        { status: 409 }
+      );
     }
   }
 
