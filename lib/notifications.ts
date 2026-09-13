@@ -1,12 +1,17 @@
 import { Resend } from "resend";
 
+function getEnv(name: string) {
+  return process.env[name] ?? "";
+}
+
 function getSender() {
-  return process.env.EMAIL_FROM ?? "VeriDrive <prenotazioni@veridrive.it>";
+  return getEnv("MAIL_FROM") || getEnv("EMAIL_FROM") || "VeriDrive <prenotazioni@veridrive.it>";
 }
 
 async function sendEmail({ to, cc, subject, html }: { to: string; cc?: string[]; subject: string; html: string }) {
-  if (!process.env.RESEND_API_KEY || !to) return { sent: false, reason: "Email non configurata" };
-  const resend = new Resend(process.env.RESEND_API_KEY);
+  const apiKey = getEnv("RESEND_API_KEY");
+  if (!apiKey || !to) return { sent: false, reason: "Email non configurata" };
+  const resend = new Resend(apiKey);
   const result = await resend.emails.send({ from: getSender(), to, ...(cc?.length ? { cc } : {}), subject, html });
   if (result.error) return { sent: false, reason: result.error.message };
   return { sent: true };
@@ -54,7 +59,7 @@ export async function sendBookingOperationalNotifications(booking: {
   slot?: string | null;
   urgency?: boolean;
 }) {
-  const recipients = [booking.workshopEmail, process.env.BOOKINGS_INBOX ?? "prenotazioni@veridrive.it"].filter((email): email is string => Boolean(email));
+  const recipients = [booking.workshopEmail, getEnv("BOOKINGS_INBOX") || "prenotazioni@veridrive.it"].filter((email): email is string => Boolean(email));
   const uniqueRecipients = [...new Set(recipients)];
   const customerEmail = booking.customerEmail?.trim();
   const vehicle = [booking.vehicleMake, booking.vehicleModel].filter(Boolean).join(" ") || "Veicolo non specificato";
@@ -69,7 +74,7 @@ export async function sendBookingOperationalNotifications(booking: {
 
 export async function sendCertificateIssuedEmail(to: string, certificate: { publicCode: string; bookingId: string; veriscore: number; vehicleMake?: string | null; vehicleModel?: string | null }) {
   const vehicle = [certificate.vehicleMake, certificate.vehicleModel].filter(Boolean).join(" ") || "la tua auto";
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://veridrive.it";
+  const baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://veridrive.it";
   const verificationUrl = `${baseUrl}/verifica/${encodeURIComponent(certificate.publicCode)}`;
   const html = `<h1>Certificato VeriScore disponibile</h1><p>La verifica della pratica <b>${certificate.bookingId}</b> è stata conclusa.</p><p>Veicolo: <b>${vehicle}</b></p><p>VeriScore: <b>${certificate.veriscore}/100</b></p><p>Il tuo certificato digitale è disponibile nella tua area cliente.</p><p><a href="${verificationUrl}">Apri e verifica il certificato</a></p>`;
   return sendEmail({ to, subject: `Certificato VeriScore ${certificate.publicCode}`, html });
