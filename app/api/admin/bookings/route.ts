@@ -5,7 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 export async function GET(request: Request) {
   try {
     await requireAdmin();
-    const db = createServiceClient();
+    const db = await createServiceClient();
     const url = new URL(request.url);
     const status = url.searchParams.get("status");
     const search = url.searchParams.get("search")?.trim() ?? "";
