@@ -7,17 +7,17 @@ type Env = {
   SUPABASE_SERVICE_ROLE_KEY?: string;
 };
 
-async function readRuntimeEnv(): Promise<Env> {
+function readRuntimeEnv(): Env {
   try {
-    const context = await getCloudflareContext({ async: true });
+    const context = getCloudflareContext();
     return (context?.env ?? {}) as unknown as Env;
   } catch {
     return {};
   }
 }
 
-export async function createServiceClient() {
-  const runtimeEnv = await readRuntimeEnv();
+export function createServiceClient() {
+  const runtimeEnv = readRuntimeEnv();
   const processEnv = process.env as Env;
 
   const url =
