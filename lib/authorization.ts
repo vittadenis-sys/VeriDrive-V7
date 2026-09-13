@@ -10,7 +10,8 @@ export async function requireAdmin() {
 
   if (authError || !user) throw new Error("Unauthorized");
 
-  const { data: admin, error: adminError } = await supabase
+  const db = createServiceClient();
+  const { data: admin, error: adminError } = await db
     .from("admins")
     .select("auth_id, role")
     .eq("auth_id", user.id)
@@ -37,14 +38,29 @@ export async function requireWorkshopOwner() {
   if (authError || !user) throw new Error("Unauthorized");
 
   const db = createServiceClient();
-  const { data: workshop, error } = await db
+
+  const { data: admin, error: adminError } = await db
+    .from("admins")
+    .select("role")
+    .eq("auth_id", user.id)
+    .maybeSingle();
+
+  if (adminError) {
+    throw new Error(`Admin lookup failed: ${adminError.message}`);
+  }
+
+  if (admin && ["admin", "super_admin"].includes(admin.role)) {
+    return user;
+  }
+
+  const { data: workshop, error: workshopError } = await db
     .from("workshops")
     .select("id")
     .eq("owner_auth_id", user.id)
     .maybeSingle();
 
-  if (error) {
-    throw new Error(`Workshop lookup failed: ${error.message}`);
+  if (workshopError) {
+    throw new Error(`Workshop lookup failed: ${workshopError.message}`);
   }
 
   if (!workshop) {
