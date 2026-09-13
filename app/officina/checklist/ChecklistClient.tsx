@@ -12,6 +12,7 @@ type Props = { bookingId: string };
 type InspectionResponse = {
   inspection?: { checklist?: Array<{ id: number; result: Result | null }>; notes?: string | null };
   booking?: {
+    service?: string | null;
     service_key?: string | null;
     plate?: string | null;
     vehicle_make?: string | null;
@@ -58,7 +59,7 @@ export default function ChecklistClient({ bookingId }: Props) {
           year: booking?.vehicle_year != null ? String(booking.vehicle_year) : "",
           vin: booking?.vin ?? "",
           mileage: booking?.vehicle_mileage != null ? String(booking.vehicle_mileage) : "",
-          serviceKey: booking?.service_key ?? "",
+          serviceKey: booking?.service_key ?? booking?.service ?? "",
         });
       } catch (error) {
         if (active) setMessage(error instanceof Error ? error.message : "Impossibile caricare la pratica.");
@@ -83,14 +84,29 @@ export default function ChecklistClient({ bookingId }: Props) {
       const response = await fetch("/api/workshop/inspection", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, checklist: checklistResults, notes, close,
-          vehicle: isCertificateService ? { plate: vehicle.plate.trim().toUpperCase(), make: vehicle.make.trim(), model: vehicle.model.trim(), year: vehicle.year ? Number(vehicle.year) : null, vin: vehicle.vin.trim().toUpperCase(), mileage: vehicle.mileage === "" ? null : Number(vehicle.mileage) } : undefined,
+        body: JSON.stringify({
+          bookingId,
+          checklist: checklistResults,
+          notes,
+          close,
+          vehicle: isCertificateService ? {
+            plate: vehicle.plate.trim().toUpperCase(),
+            make: vehicle.make.trim(),
+            model: vehicle.model.trim(),
+            year: vehicle.year ? Number(vehicle.year) : null,
+            vin: vehicle.vin.trim().toUpperCase(),
+            mileage: vehicle.mileage === "" ? null : Number(vehicle.mileage),
+          } : undefined,
         }),
       });
       const data = await response.json() as { error?: string; veriscore?: number };
       if (!response.ok) throw new Error(data.error ?? "Salvataggio non riuscito.");
       if (close) {
-        const statusResponse = await fetch("/api/workshop/status", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId, toStatus: "completed" }) });
+        const statusResponse = await fetch("/api/workshop/status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookingId, toStatus: "completed" }),
+        });
         const statusData = await statusResponse.json() as { error?: string };
         if (!statusResponse.ok) throw new Error(statusData.error ?? "Impossibile chiudere la verifica.");
       }
@@ -104,6 +120,7 @@ export default function ChecklistClient({ bookingId }: Props) {
     <Link href="/officina">← Torna alla dashboard</Link>
     <div className="eyebrow" style={{ marginTop: 24 }}>Pratica {bookingId}</div>
     <h1 style={{ fontSize: "clamp(34px, 6vw, 48px)" }}>Checklist tecnica</h1>
+
     {isCertificateService && <section className="panel" style={{ marginTop: 18 }}><div className="eyebrow">DATI VEICOLO · CERTIFICATO</div><h3>Conferma i dati prima della chiusura</h3><p style={{ opacity: .75 }}>Completa targa, telaio e chilometraggio prima di chiudere il certificato.</p><div className="form" style={{ marginTop: 12 }}>
       <label>Targa<input value={vehicle.plate} onChange={(e) => setVehicle((v) => ({ ...v, plate: e.target.value }))} /></label>
       <label>Marca<input value={vehicle.make} onChange={(e) => setVehicle((v) => ({ ...v, make: e.target.value }))} /></label>
@@ -112,13 +129,21 @@ export default function ChecklistClient({ bookingId }: Props) {
       <label className="full">Telaio / VIN<input value={vehicle.vin} onChange={(e) => setVehicle((v) => ({ ...v, vin: e.target.value.toUpperCase() }))} placeholder="Inserisci il VIN completo" /></label>
       <label className="full">Chilometri<input value={vehicle.mileage} type="number" min="0" step="1" inputMode="numeric" onChange={(e) => setVehicle((v) => ({ ...v, mileage: e.target.value }))} placeholder="Es. 48230" /></label>
     </div>{!hasVehicleIdentity && <p className="notice" style={{ marginTop: 12 }}>Per chiudere VeriScore o VeriScorePlus servono targa, VIN e chilometraggio.</p>}</section>}
-    <div className="panel" style={{ position: "sticky", top: 86, zIndex: 2, display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", marginTop: 18 }}><VeriScore score={score} size={92} /><div><p style={{ marginBottom: 6 }}><b>{score}/100</b></p><p style={{ margin: 0 }}>{completed}/{checklist.length} controlli compilati</p></div></div>
+
+    <div className="panel" style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", marginTop: 18, marginBottom: 24 }}>
+      <VeriScore score={score} size={92} />
+      <div><p style={{ marginBottom: 6 }}><b>{score}/100</b></p><p style={{ margin: 0 }}>{completed}/{checklist.length} controlli compilati</p></div>
+    </div>
+
     {loading && <p className="notice" style={{ marginTop: 18 }}>Caricamento della pratica…</p>}
-    <div className="checklist" style={{ marginTop: 24 }}>{checklist.map((item) => <div className="check" key={item.id} style={{ display: "block" }}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}><span style={{ minWidth: 220, flex: "1 1 260px" }}><small>{item.id}. {item.area}</small><br /><b>{item.label}</b></span><div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-      <button type="button" className={`button ${values[item.id] === "ok" ? "" : "secondary"}`} onClick={() => setResult(item.id, "ok")}>OK</button>
-      <button type="button" className={`button ${values[item.id] === "issue" ? "" : "secondary"}`} onClick={() => setResult(item.id, "issue")}>Anomalia</button>
-      <button type="button" className={`button ${values[item.id] === "critical" ? "" : "secondary"}`} onClick={() => setResult(item.id, "critical")}>Anomalia grave</button>
-    </div></div></div>)}</div>
+    <div className="checklist" style={{ marginTop: 24 }}>
+      {checklist.map((item) => <div className="check" key={item.id} style={{ display: "block" }}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}><span style={{ minWidth: 220, flex: "1 1 260px" }}><small>{item.id}. {item.area}</small><br /><b>{item.label}</b></span><div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <button type="button" className={`button ${values[item.id] === "ok" ? "" : "secondary"}`} onClick={() => setResult(item.id, "ok")}>OK</button>
+        <button type="button" className={`button ${values[item.id] === "issue" ? "" : "secondary"}`} onClick={() => setResult(item.id, "issue")}>Anomalia</button>
+        <button type="button" className={`button ${values[item.id] === "critical" ? "" : "secondary"}`} onClick={() => setResult(item.id, "critical")}>Anomalia grave</button>
+      </div></div></div>)}
+    </div>
+
     <section className="panel" style={{ marginTop: 24 }}><h3>Note finali</h3><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Annotazioni del tecnico..." rows={5} style={{ width: "100%" }} /></section>
     <div className="actions" style={{ marginTop: 24 }}><button type="button" className="button" onClick={() => void saveInspection(false)} disabled={busy || loading || !completed}>Salva ispezione</button><button type="button" className="button" onClick={() => void saveInspection(true)} disabled={busy || loading || !canClose}>{isCertificateService ? "Chiudi e genera certificato" : "Chiudi verifica"}</button></div>
     {message && <p className="notice" style={{ marginTop: 16 }}>{message}</p>}
