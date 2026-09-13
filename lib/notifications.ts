@@ -71,9 +71,11 @@ export async function sendBookingOperationalNotifications(booking: {
 }
 
 export async function sendCertificateIssuedEmail(to: string, certificate: { publicCode: string; bookingId: string; veriscore: number; vehicleMake?: string | null; vehicleModel?: string | null }) {
+  const customerEmail = to?.trim();
+  if (!customerEmail) return { sent: false, reason: "Email cliente mancante" };
   const vehicle = [certificate.vehicleMake, certificate.vehicleModel].filter(Boolean).join(" ") || "la tua auto";
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://veridrive.it";
   const verificationUrl = `${baseUrl}/verifica/${encodeURIComponent(certificate.publicCode)}`;
-  const html = `<h1>Certificato VeriScore disponibile</h1><p>La verifica della pratica <b>${certificate.bookingId}</b> è stata conclusa.</p><p>Veicolo: <b>${vehicle}</b></p><p>VeriScore: <b>${certificate.veriscore}/100</b></p><p>Il tuo certificato digitale è disponibile nella tua area cliente.</p><p><a href="${verificationUrl}">Apri e verifica il certificato</a></p>`;
-  return sendEmail({ to, subject: `Certificato VeriScore ${certificate.publicCode}`, html });
+  const html = `<h1>Il tuo certificato VeriScore è pronto</h1><p>La verifica della pratica <b>${certificate.bookingId}</b> è stata conclusa.</p><p>Veicolo: <b>${vehicle}</b></p><p>VeriScore: <b>${certificate.veriscore}/100</b></p><p>Il certificato digitale è ora disponibile nella tua area cliente.</p><p><a href="${verificationUrl}">Apri il certificato e verifica il codice pubblico</a></p>`;
+  return sendEmail({ to: customerEmail, subject: `Certificato VeriScore disponibile – ${certificate.publicCode}`, html });
 }
