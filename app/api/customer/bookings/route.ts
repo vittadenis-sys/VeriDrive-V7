@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-const ROUTE_VERSION = "customer-bookings-2026-09-12-v3";
+const ROUTE_VERSION = "customer-bookings-2026-09-13-v4";
 
 function json(data: Record<string, unknown>, status = 200) {
   return NextResponse.json({ routeVersion: ROUTE_VERSION, ...data }, {
@@ -60,6 +60,13 @@ export async function GET() {
       return json({ stage: "bookings", error: error.message, code: error.code, details: error.details, hint: error.hint, customerId: customer.id }, 400);
     }
 
+    const { data: certificates, error: certificatesError } = await db
+      .from("veriscore_certificates")
+      .select("id,booking_id,public_code,vehicle_plate,vehicle_vin,vehicle_make,vehicle_model,vehicle_year,vehicle_mileage,veriscore,workshop_id,issued_at")
+      .eq("booking_id", (bookings ?? []).map((booking) => booking.id));
+
+    const safeCertificates = certificatesError ? [] : (certificates ?? []);
+
     const normalizedBookings = (bookings ?? []).map((booking) => ({
       id: booking.id ?? null,
       booking_code: booking.booking_code ?? null,
@@ -88,6 +95,7 @@ export async function GET() {
         free_bookings: autogermaFreeBookingBonus,
       },
       bookings: normalizedBookings,
+      certificates: safeCertificates,
       bookingColumns: bookings && bookings.length > 0 ? Object.keys(bookings[0]) : [],
     });
   } catch (error) {
