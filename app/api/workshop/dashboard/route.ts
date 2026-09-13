@@ -42,7 +42,7 @@ export async function GET() {
 
     const { data: bookings, error: bookingsError } = await db
       .from("bookings")
-      .select("id,booking_code,customer_id,vehicle_id,workshop_id,service,status,inspection_date,total,travel_km,overall_notes,created_at,updated_at")
+      .select("id,booking_code,customer_id,vehicle_id,workshop_id,service,status,inspection_date,total,travel_km,overall_notes,created_at")
       .eq("workshop_id", workshop.id)
       .order("inspection_date", { ascending: true, nullsFirst: false });
 
