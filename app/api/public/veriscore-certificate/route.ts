@@ -1,4 +1,4 @@
-import { NextResponse } from "@/lib/supabase/service";
+import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 function maskPlate(value: string) {
@@ -48,8 +48,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ certificate: {
       public_code: certificate.public_code,
-      vehicle_plate: maskPlate(certificate.vehicle_plate),
-      vehicle_vin: maskVin(certificate.vehicle_vin),
+      vehicle_plate: maskPlate(String(certificate.vehicle_plate ?? "")),
+      vehicle_vin: maskVin(String(certificate.vehicle_vin ?? "")),
       vehicle_make: certificate.vehicle_make,
       vehicle_model: certificate.vehicle_model,
       vehicle_year: certificate.vehicle_year,
