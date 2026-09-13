@@ -1,10 +1,24 @@
 import { createClient } from "@supabase/supabase-js";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-export function createServiceClient() {
-  const { env } = getCloudflareContext();
-  const runtimeEnv = env as unknown as Record<string, string | undefined>;
-  const processEnv = process.env as Record<string, string | undefined>;
+type Env = {
+  NEXT_PUBLIC_SUPABASE_URL?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+};
+
+async function readRuntimeEnv(): Promise<Env> {
+  try {
+    const context = await getCloudflareContext({ async: true });
+    return (context?.env ?? {}) as unknown as Env;
+  } catch {
+    return {};
+  }
+}
+
+export async function createServiceClient() {
+  const runtimeEnv = await readRuntimeEnv();
+  const processEnv = process.env as Env;
 
   const url =
     processEnv.NEXT_PUBLIC_SUPABASE_URL ||
