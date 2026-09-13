@@ -1,6 +1,4 @@
--- VeriDrive V24: live compatibility for certificates / inspections / Plus photos.
--- Additive and idempotent. The application owns inspection creation.
-
+-- VeriDrive V24: live compatibility for certificates and Plus photos.
 create table if not exists public.inspections (
   id uuid primary key default gen_random_uuid(),
   booking_id uuid unique not null references public.bookings(id) on delete cascade,
@@ -12,7 +10,6 @@ create table if not exists public.inspections (
   completed_at timestamptz,
   updated_at timestamptz not null default now()
 );
-
 create table if not exists public.photos (
   id uuid primary key default gen_random_uuid(),
   inspection_id uuid not null references public.inspections(id) on delete cascade,
@@ -21,18 +18,8 @@ create table if not exists public.photos (
   check_id integer check (check_id between 1 and 50),
   created_at timestamptz not null default now()
 );
-
 create index if not exists photos_inspection_created_at_idx on public.photos(inspection_id, created_at);
-
-insert into storage.buckets (id, name, public)
-values ('inspection-photos', 'inspection-photos', false)
-on conflict (id) do nothing;
-
--- Remove any legacy automatic inspection trigger. The app creates/updates the row explicitly.
+insert into storage.buckets (id, name, public) values ('inspection-photos','inspection-photos',false) on conflict (id) do nothing;
 drop trigger if exists veridrive_sync_inspection_from_booking on public.bookings;
-
--- Normalize public-code lookup and booking lookups.
-create unique index if not exists veriscore_certificates_public_code_upper_uidx
-  on public.veriscore_certificates (upper(btrim(public_code)));
-create index if not exists veriscore_certificates_booking_id_idx
-  on public.veriscore_certificates (booking_id);
+create unique index if not exists veriscore_certificates_public_code_upper_uidx on public.veriscore_certificates (upper(btrim(public_code)));
+create index if not exists veriscore_certificates_booking_id_idx on public.veriscore_certificates (booking_id);
