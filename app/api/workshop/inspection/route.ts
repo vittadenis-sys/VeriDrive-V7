@@ -26,34 +26,42 @@ export async function GET(request: Request) {
 
     const { data: booking, error: bookingError } = await db
       .from("bookings")
-      .select("id,workshop_id,service,plate,vehicle_make,vehicle_model,vehicle_year,vin,vehicle_mileage,overall_notes,vehicle_id")
+      .select("id,workshop_id,service,overall_notes,vehicle_id")
       .eq("id", bookingId)
       .maybeSingle();
     if (bookingError) return NextResponse.json({ error: bookingError.message }, { status: 500 });
     if (!booking || booking.workshop_id !== workshop.id) return NextResponse.json({ error: "Pratica non trovata." }, { status: 404 });
 
-    let vehicle: { make?: string | null; model?: string | null; year?: number | null } | null = null;
+    let vehicle: Record<string, unknown> | null = null;
     if (booking.vehicle_id) {
-      const { data } = await db.from("vehicles").select("make,model,year").eq("id", booking.vehicle_id).maybeSingle();
-      vehicle = data;
+      const { data: vehicleData, error: vehicleError } = await db
+        .from("vehicles")
+        .select("*")
+        .eq("id", booking.vehicle_id)
+        .maybeSingle();
+      if (vehicleError) return NextResponse.json({ error: vehicleError.message }, { status: 500 });
+      vehicle = vehicleData;
     }
 
     const stored = parseOverallNotes(booking.overall_notes);
-    const make = booking.vehicle_make ?? vehicle?.make ?? null;
-    const model = booking.vehicle_model ?? vehicle?.model ?? null;
-    const year = booking.vehicle_year ?? vehicle?.year ?? null;
+    const plate = String(vehicle?.plate ?? vehicle?.registration ?? vehicle?.license_plate ?? "");
+    const make = String(vehicle?.make ?? vehicle?.brand ?? vehicle?.vehicle_make ?? "");
+    const model = String(vehicle?.model ?? vehicle?.vehicle_model ?? "");
+    const year = vehicle?.year ?? vehicle?.vehicle_year ?? null;
+    const vin = String(vehicle?.vin ?? vehicle?.vehicle_vin ?? "");
+    const mileage = vehicle?.mileage ?? vehicle?.vehicle_mileage ?? null;
 
     return NextResponse.json({
       booking: {
         id: booking.id,
         workshop_id: booking.workshop_id,
         service: booking.service,
-        plate: booking.plate,
-        vehicle_make: make,
-        vehicle_model: model,
+        plate,
+        vehicle_make: make || null,
+        vehicle_model: model || null,
         vehicle_year: year,
-        vin: booking.vin,
-        vehicle_mileage: booking.vehicle_mileage,
+        vin: vin || null,
+        vehicle_mileage: mileage,
       },
       inspection: {
         checklist: Array.isArray(stored.checklist) ? stored.checklist : [],
@@ -100,7 +108,7 @@ export async function PUT(request: Request) {
 
     const { data: booking, error: bookingError } = await db
       .from("bookings")
-      .select("id,customer_id,workshop_id,status,service,plate,vehicle_make,vehicle_model,vehicle_year,vin,vehicle_mileage,overall_notes")
+      .select("id,customer_id,workshop_id,status,service,overall_notes,vehicle_id")
       .eq("id", bookingId)
       .maybeSingle();
     if (bookingError) return NextResponse.json({ error: bookingError.message }, { status: 500 });
@@ -116,13 +124,25 @@ export async function PUT(request: Request) {
 
     const serviceKey = String(booking.service ?? "").trim();
     const certificateService = serviceKey === "veriscore" || serviceKey === "veriscore_plus";
+
+    let currentVehicle: Record<string, unknown> = {};
+    if (booking.vehicle_id) {
+      const { data: vehicleData, error: vehicleError } = await db
+        .from("vehicles")
+        .select("*")
+        .eq("id", booking.vehicle_id)
+        .maybeSingle();
+      if (vehicleError) return NextResponse.json({ error: vehicleError.message }, { status: 500 });
+      currentVehicle = vehicleData ?? {};
+    }
+
     const incomingVehicle = body.vehicle ?? {};
-    const nextPlate = String(incomingVehicle.plate ?? booking.plate ?? "").trim().toUpperCase();
-    const nextMake = String(incomingVehicle.make ?? booking.vehicle_make ?? "").trim();
-    const nextModel = String(incomingVehicle.model ?? booking.vehicle_model ?? "").trim();
-    const nextYear = incomingVehicle.year ?? booking.vehicle_year ?? null;
-    const nextVin = String(incomingVehicle.vin ?? booking.vin ?? "").trim().toUpperCase();
-    const rawMileage = incomingVehicle.mileage ?? booking.vehicle_mileage;
+    const nextPlate = String(incomingVehicle.plate ?? currentVehicle.plate ?? currentVehicle.registration ?? currentVehicle.license_plate ?? "").trim().toUpperCase();
+    const nextMake = String(incomingVehicle.make ?? currentVehicle.make ?? currentVehicle.brand ?? currentVehicle.vehicle_make ?? "").trim();
+    const nextModel = String(incomingVehicle.model ?? currentVehicle.model ?? currentVehicle.vehicle_model ?? "").trim();
+    const nextYear = incomingVehicle.year ?? currentVehicle.year ?? currentVehicle.vehicle_year ?? null;
+    const nextVin = String(incomingVehicle.vin ?? currentVehicle.vin ?? currentVehicle.vehicle_vin ?? "").trim().toUpperCase();
+    const rawMileage = incomingVehicle.mileage ?? currentVehicle.mileage ?? currentVehicle.vehicle_mileage ?? null;
     const nextMileage = rawMileage === null || rawMileage === undefined || rawMileage === "" ? null : Number(rawMileage);
 
     if (body.close && certificateService) {
@@ -131,6 +151,7 @@ export async function PUT(request: Request) {
       if (nextMileage === null || !Number.isFinite(nextMileage) || nextMileage < 0) return NextResponse.json({ error: "Per chiudere VeriScore servono i chilometri." }, { status: 400 });
     }
 
+    const completedAt = body.close ? new Date().toISOString() : previousNotes.completed_at ?? null;
     const updatePayload: Record<string, unknown> = {
       overall_notes: JSON.stringify({
         ...previousNotes,
@@ -139,21 +160,16 @@ export async function PUT(request: Request) {
         passed_checks: passedChecks,
         completed_checks: completedChecks,
         veriscore,
-        completed_at: body.close ? new Date().toISOString() : previousNotes.completed_at ?? null,
+        completed_at: completedAt,
       }),
       status: body.close ? "completed" : booking.status,
     };
 
-    if (body.vehicle || certificateService) {
-      updatePayload.plate = nextPlate;
-      updatePayload.vehicle_make = nextMake || null;
-      updatePayload.vehicle_model = nextModel || null;
-      updatePayload.vehicle_year = nextYear == null || nextYear === "" ? null : Number(nextYear);
-      updatePayload.vin = nextVin || null;
-      updatePayload.vehicle_mileage = nextMileage;
-    }
-
-    const { error: saveError } = await db.from("bookings").update(updatePayload).eq("id", bookingId).eq("workshop_id", workshop.id);
+    const { error: saveError } = await db
+      .from("bookings")
+      .update(updatePayload)
+      .eq("id", bookingId)
+      .eq("workshop_id", workshop.id);
     if (saveError) return NextResponse.json({ error: saveError.message }, { status: 400 });
 
     let certificate: Record<string, unknown> | null = null;
@@ -184,7 +200,7 @@ export async function PUT(request: Request) {
             vehicle_mileage: Number(nextMileage),
             veriscore,
             workshop_id: workshop.id,
-            issued_at: new Date().toISOString(),
+            issued_at: completedAt,
           })
           .select("id,public_code,booking_id,veriscore,issued_at,vehicle_plate,vehicle_vin,vehicle_make,vehicle_model,vehicle_year,vehicle_mileage,workshop_id")
           .single();
