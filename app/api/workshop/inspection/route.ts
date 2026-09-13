@@ -3,6 +3,47 @@ import { requireWorkshopOwner } from "@/lib/authorization";
 import { createServiceClient } from "@/lib/supabase/service";
 import { calculateWeightedVeriscore } from "@/lib/veriscore";
 
+export async function GET(request: Request) {
+  try {
+    const user = await requireWorkshopOwner();
+    const bookingId = new URL(request.url).searchParams.get("bookingId")?.trim();
+    if (!bookingId) return NextResponse.json({ error: "Pratica non trovata." }, { status: 400 });
+
+    const db = createServiceClient();
+    const { data: workshop } = await db
+      .from("workshops")
+      .select("id")
+      .eq("owner_auth_id", user.id)
+      .maybeSingle();
+    if (!workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
+
+    const { data: booking, error: bookingError } = await db
+      .from("bookings")
+      .select("id,workshop_id,service")
+      .eq("id", bookingId)
+      .maybeSingle();
+
+    if (bookingError) return NextResponse.json({ error: bookingError.message }, { status: 500 });
+    if (!booking || booking.workshop_id !== workshop.id) return NextResponse.json({ error: "Pratica non trovata." }, { status: 404 });
+
+    const { data: inspection, error: inspectionError } = await db
+      .from("inspections")
+      .select("id,checklist,notes,passed_checks,veriscore,completed_at")
+      .eq("booking_id", bookingId)
+      .maybeSingle();
+
+    if (inspectionError) return NextResponse.json({ error: inspectionError.message }, { status: 500 });
+
+    return NextResponse.json({
+      booking,
+      inspection: inspection ?? { checklist: [], notes: null },
+    });
+  } catch (error) {
+    console.error("WORKSHOP_INSPECTION_GET_ERROR", error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Errore interno." }, { status: 500 });
+  }
+}
+
 export async function PUT(request: Request) {
   try {
     const user = await requireWorkshopOwner();
@@ -11,7 +52,6 @@ export async function PUT(request: Request) {
       checklist?: Array<{ id: number; area: string; label: string; result: "ok" | "issue" | "critical" | null }>;
       notes?: string;
       close?: boolean;
-      vehicle?: { plate?: string | null; make?: string | null; model?: string | null; year?: number | null; vin?: string | null; mileage?: number | null };
     };
 
     const bookingId = String(body.bookingId ?? "").trim();
@@ -21,38 +61,30 @@ export async function PUT(request: Request) {
     }
 
     const db = createServiceClient();
-    const { data: workshop } = await db.from("workshops").select("id").eq("owner_auth_id", user.id).single();
+    const { data: workshop } = await db
+      .from("workshops")
+      .select("id")
+      .eq("owner_auth_id", user.id)
+      .maybeSingle();
     if (!workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
 
-    const { data: booking } = await db.from("bookings")
-      .select("id,workshop_id,status,service_key,plate,vehicle_make,vehicle_model,vehicle_year,vin,vehicle_mileage")
-      .eq("id", bookingId).single();
+    const { data: booking, error: bookingError } = await db
+      .from("bookings")
+      .select("id,workshop_id,service")
+      .eq("id", bookingId)
+      .maybeSingle();
+    if (bookingError) return NextResponse.json({ error: bookingError.message }, { status: 500 });
     if (!booking || booking.workshop_id !== workshop.id) return NextResponse.json({ error: "Pratica non trovata." }, { status: 404 });
-
-    const isCertificateService = ["veriscore", "veriscore_plus"].includes(booking.service_key);
-    const vehicle = body.vehicle ?? {};
-    const nextPlate = isCertificateService && typeof vehicle.plate === "string" ? vehicle.plate.trim().toUpperCase() : booking.plate;
-    const nextMake = isCertificateService && typeof vehicle.make === "string" ? vehicle.make.trim() || null : booking.vehicle_make;
-    const nextModel = isCertificateService && typeof vehicle.model === "string" ? vehicle.model.trim() || null : booking.vehicle_model;
-    const nextYear = isCertificateService && vehicle.year != null ? Number(vehicle.year) : booking.vehicle_year;
-    const nextVin = isCertificateService && typeof vehicle.vin === "string" ? vehicle.vin.trim().toUpperCase() || null : booking.vin;
-    const nextMileage = isCertificateService && vehicle.mileage != null ? Number(vehicle.mileage) : booking.vehicle_mileage;
-
-    if (body.close && isCertificateService) {
-      if (!nextPlate) return NextResponse.json({ error: "Per chiudere la pratica serve la targa." }, { status: 400 });
-      if (!nextVin) return NextResponse.json({ error: "Per chiudere la pratica serve il VIN/telaio." }, { status: 400 });
-      if (nextMileage == null || Number.isNaN(nextMileage) || nextMileage < 0) return NextResponse.json({ error: "Per chiudere la pratica servono i chilometri." }, { status: 400 });
-    }
 
     const results = Object.fromEntries(checklistResults.map((item) => [item.id, item.result ?? undefined]));
     const passedChecks = checklistResults.filter((item) => item.result === "ok").length;
     const veriscore = calculateWeightedVeriscore(results);
-    const { data: existing } = await db.from("inspections").select("id").eq("booking_id", bookingId).maybeSingle();
-
-    if (isCertificateService) {
-      const { error: vehicleError } = await db.from("bookings").update({ plate: nextPlate, vehicle_make: nextMake, vehicle_model: nextModel, vehicle_year: nextYear, vin: nextVin, vehicle_mileage: nextMileage }).eq("id", bookingId);
-      if (vehicleError) return NextResponse.json({ error: vehicleError.message }, { status: 400 });
-    }
+    const { data: existing, error: existingError } = await db
+      .from("inspections")
+      .select("id")
+      .eq("booking_id", bookingId)
+      .maybeSingle();
+    if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
 
     const payload = {
       booking_id: bookingId,
@@ -63,11 +95,14 @@ export async function PUT(request: Request) {
       completed_at: body.close ? new Date().toISOString() : existing ? undefined : null,
     };
 
-    const query = existing ? db.from("inspections").update(payload).eq("id", existing.id) : db.from("inspections").insert(payload);
-    const { error } = await query;
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    const { error: saveError } = existing
+      ? await db.from("inspections").update(payload).eq("id", existing.id)
+      : await db.from("inspections").insert(payload);
+
+    if (saveError) return NextResponse.json({ error: saveError.message }, { status: 400 });
     return NextResponse.json({ ok: true, passedChecks, veriscore });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Non autorizzato" }, { status: 401 });
+    console.error("WORKSHOP_INSPECTION_PUT_ERROR", error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Errore interno." }, { status: 500 });
   }
 }
