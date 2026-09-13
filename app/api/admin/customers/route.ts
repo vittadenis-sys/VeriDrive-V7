@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const db = createServiceClient();
+    const db = await createServiceClient();
     const { data: admin, error: adminError } = await db
       .from("admins")
       .select("auth_id,role")
