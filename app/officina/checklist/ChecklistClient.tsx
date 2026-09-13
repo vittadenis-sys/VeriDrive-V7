@@ -13,13 +13,10 @@ type InspectionResponse = {
   inspection?: { checklist?: Array<{ id: number; result: Result | null }>; notes?: string | null };
   booking?: {
     service?: string | null;
-    service_key?: string | null;
     plate?: string | null;
-    vehicle_make?: string | null;
-    vehicle_model?: string | null;
-    vehicle_year?: number | null;
     vin?: string | null;
     vehicle_mileage?: number | null;
+    vehicle?: { make?: string | null; model?: string | null; year?: number | null } | null;
   };
 };
 
@@ -54,12 +51,12 @@ export default function ChecklistClient({ bookingId }: Props) {
         const booking = data.booking;
         setVehicle({
           plate: booking?.plate ?? "",
-          make: booking?.vehicle_make ?? "",
-          model: booking?.vehicle_model ?? "",
-          year: booking?.vehicle_year != null ? String(booking.vehicle_year) : "",
+          make: booking?.vehicle?.make ?? "",
+          model: booking?.vehicle?.model ?? "",
+          year: booking?.vehicle?.year != null ? String(booking.vehicle.year) : "",
           vin: booking?.vin ?? "",
           mileage: booking?.vehicle_mileage != null ? String(booking.vehicle_mileage) : "",
-          serviceKey: booking?.service_key ?? booking?.service ?? "",
+          serviceKey: booking?.service ?? "",
         });
       } catch (error) {
         if (active) setMessage(error instanceof Error ? error.message : "Impossibile caricare la pratica.");
@@ -111,6 +108,17 @@ export default function ChecklistClient({ bookingId }: Props) {
     <Link href="/officina">← Torna alla dashboard</Link>
     <div className="eyebrow" style={{ marginTop: 24 }}>Pratica {bookingId}</div>
     <h1 style={{ fontSize: "clamp(34px, 6vw, 48px)" }}>Checklist tecnica</h1>
+
+    <section className="panel" style={{ marginTop: 18 }}>
+      <div className="eyebrow">DATI VEICOLO</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginTop: 12 }}>
+        <div><small>Targa</small><strong style={{ display: "block" }}>{vehicle.plate || "—"}</strong></div>
+        <div><small>Veicolo</small><strong style={{ display: "block" }}>{[vehicle.make, vehicle.model].filter(Boolean).join(" ") || "—"}</strong></div>
+        <div><small>Anno</small><strong style={{ display: "block" }}>{vehicle.year || "—"}</strong></div>
+        <div><small>Chilometri</small><strong style={{ display: "block" }}>{vehicle.mileage || "—"}</strong></div>
+        <div className="full"><small>VIN</small><strong style={{ display: "block", wordBreak: "break-all" }}>{vehicle.vin || "—"}</strong></div>
+      </div>
+    </section>
 
     {isCertificateService && <section className="panel" style={{ marginTop: 18 }}><div className="eyebrow">DATI VEICOLO · CERTIFICATO</div><h3>Conferma i dati prima della chiusura</h3><p style={{ opacity: .75 }}>Completa targa, telaio e chilometraggio prima di chiudere il certificato.</p><div className="form" style={{ marginTop: 12 }}>
       <label>Targa<input value={vehicle.plate} onChange={(e) => setVehicle((v) => ({ ...v, plate: e.target.value }))} /></label>
