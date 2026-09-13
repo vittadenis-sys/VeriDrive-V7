@@ -61,28 +61,25 @@ export async function PATCH(request: Request) {
       }
 
       const checklist = Array.isArray(notes.checklist) ? notes.checklist : [];
-      const completedChecks = checklist.filter((item) => item && typeof item === "object" && (item as { result?: unknown }).result).length;
+      const completedChecks = checklist.filter(
+        (item) => item && typeof item === "object" && (item as { result?: unknown }).result != null
+      ).length;
+
       if (completedChecks !== 50) {
         return NextResponse.json(
           { error: "Completa tutti i 50 controlli con un esito prima di chiudere la verifica." },
           { status: 400 }
         );
       }
-
-      const { error } = await db
-        .from("bookings")
-        .update({ status: "completed" })
-        .eq("id", bookingId)
-        .eq("workshop_id", workshop.id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    } else {
-      const { error } = await db
-        .from("bookings")
-        .update({ status: toStatus })
-        .eq("id", bookingId)
-        .eq("workshop_id", workshop.id);
-      if (error) throw error;
     }
+
+    const { error } = await db
+      .from("bookings")
+      .update({ status: toStatus })
+      .eq("id", bookingId)
+      .eq("workshop_id", workshop.id);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
     return NextResponse.json({ ok: true, status: toStatus });
   } catch (error) {
