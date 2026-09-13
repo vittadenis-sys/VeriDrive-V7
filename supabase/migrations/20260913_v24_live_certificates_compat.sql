@@ -1,5 +1,5 @@
 -- VeriDrive V24: live compatibility for certificates / inspections / Plus photos.
--- Keep additive/idempotent so existing deployments can be upgraded safely.
+-- Additive and idempotent. The application owns inspection creation.
 
 create table if not exists public.inspections (
   id uuid primary key default gen_random_uuid(),
@@ -28,38 +28,11 @@ insert into storage.buckets (id, name, public)
 values ('inspection-photos', 'inspection-photos', false)
 on conflict (id) do nothing;
 
-create or replace function public.veridrive_sync_inspection_from_booking()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if new.status = 'completed' and coalesce(old.status, '') <> 'completed' then
-    insert into public.inspections (booking_id, inspector_auth_id, checklist, passed_checks, notes, completed_at, updated_at)
-    select
-      new.id,
-      null,
-      coalesce((try_cast := NULL)::jsonb, '[]'::jsonb),
-      0,
-      null,
-      now(),
-      now();
-  end if;
-  return new;
-exception when others then
-  return new;
-end;
-$$;
-
--- Do not install the trigger above: the application owns inspection creation.
--- The function is intentionally retained only for compatibility with legacy DBs.
-
+-- Remove any legacy automatic inspection trigger. The app creates/updates the row explicitly.
 drop trigger if exists veridrive_sync_inspection_from_booking on public.bookings;
 
--- Make public certificate lookup robust against historical whitespace/case drift.
+-- Normalize public-code lookup and booking lookups.
 create unique index if not exists veriscore_certificates_public_code_upper_uidx
   on public.veriscore_certificates (upper(btrim(public_code)));
-
 create index if not exists veriscore_certificates_booking_id_idx
   on public.veriscore_certificates (booking_id);
