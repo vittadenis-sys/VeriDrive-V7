@@ -2,24 +2,60 @@ import Link from "next/link";
 import { CheckCircle2, ShieldCheck, XCircle } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { createServiceClient } from "@/lib/supabase/service";
+
+function normalizeCode(value: string) {
+  return value.trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function maskPlate(value: string) {
+  const clean = value.trim().toUpperCase();
+  if (!clean) return "";
+  return clean.split("").map((char, index) => index === 0 || index === 2 || index === clean.length - 1 ? char : "*").join("");
+}
+
+function maskVin(value: string) {
+  const clean = value.trim().toUpperCase();
+  if (!clean) return "";
+  if (clean.length <= 8) return clean;
+  return `${"*".repeat(clean.length - 8)}${clean.slice(-8)}`;
+}
 
 async function getCertificate(code: string) {
-  const response = await fetch(`/api/public/veriscore-certificate?code=${encodeURIComponent(code)}`, { cache: "no-store" });
-  if (!response.ok) return null;
-  return (await response.json()).certificate as {
-    public_code: string;
-    vehicle_plate: string;
-    vehicle_vin: string;
-    vehicle_make: string | null;
-    vehicle_model: string | null;
-    vehicle_year: number | null;
-    vehicle_mileage: number;
-    veriscore: number;
-    workshop_name: string | null;
-    issued_at: string;
-    service?: string | null;
-    is_plus?: boolean;
-    photos?: Array<{ id: string; caption: string | null; check_id: number | null; image_url: string | null }>;
+  const normalizedCode = normalizeCode(code);
+  if (!normalizedCode) return null;
+
+  const db = createServiceClient();
+  const { data, error } = await db
+    .from("veriscore_certificates")
+    .select("id,public_code,booking_id,vehicle_plate,vehicle_vin,vehicle_make,vehicle_model,vehicle_year,vehicle_mileage,veriscore,workshop_id,issued_at")
+    .limit(50);
+
+  if (error) throw new Error(error.message);
+
+  const certificate = (data ?? []).find((row) => normalizeCode(String(row.public_code ?? "")) === normalizedCode);
+  if (!certificate) return null;
+
+  const { data: workshop } = await db.from("workshops").select("name").eq("id", certificate.workshop_id).maybeSingle();
+  let service: string | null = null;
+  if (certificate.booking_id) {
+    const { data: booking } = await db.from("bookings").select("service").eq("id", certificate.booking_id).maybeSingle();
+    service = booking?.service ?? null;
+  }
+
+  return {
+    public_code: certificate.public_code,
+    vehicle_plate: maskPlate(String(certificate.vehicle_plate ?? "")),
+    vehicle_vin: maskVin(String(certificate.vehicle_vin ?? "")),
+    vehicle_make: certificate.vehicle_make,
+    vehicle_model: certificate.vehicle_model,
+    vehicle_year: certificate.vehicle_year,
+    vehicle_mileage: certificate.vehicle_mileage,
+    veriscore: certificate.veriscore,
+    workshop_name: workshop?.name ?? null,
+    issued_at: certificate.issued_at,
+    service,
+    is_plus: service === "veriscore_plus",
   };
 }
 
@@ -48,7 +84,6 @@ export default async function PublicCertificate({ params }: { params: Promise<{ 
             </section>
             <section className="cards" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", marginTop: 18 }}><div className="metric"><span>Codice certificato</span><strong style={{ fontSize: 18 }}>{certificate.public_code}</strong></div><div className="metric"><span>Targa</span><strong>{certificate.vehicle_plate}</strong></div><div className="metric"><span>Telaio</span><strong style={{ fontSize: 16 }}>{certificate.vehicle_vin}</strong></div><div className="metric"><span>Km certificati</span><strong>{certificate.vehicle_mileage.toLocaleString("it-IT")}</strong></div></section>
             <section className="panel" style={{ marginTop: 18 }}><h3>Dettagli della certificazione</h3><p style={{ marginBottom: 8 }}><b>Data verifica:</b> {formatDate(certificate.issued_at)}</p><p style={{ marginBottom: 0 }}><b>Officina:</b> {certificate.workshop_name ?? "Officina VeriDrive"}</p></section>
-            {isPlus && (certificate.photos ?? []).length > 0 && <section className="panel" style={{ marginTop: 18 }}><div className="eyebrow">VERISCORE PLUS</div><h3>Documentazione fotografica</h3><p>10 fotografie dell'auto raccolte nell'ambito della verifica Plus.</p><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10, marginTop: 14 }}>{(certificate.photos ?? []).map((photo, index) => photo.image_url ? <figure key={photo.id} style={{ margin: 0 }}><img src={photo.image_url} alt={`Documentazione ${index + 1}`} style={{ width: "100%", aspectRatio: "4 / 3", objectFit: "cover", borderRadius: 8 }} /><figcaption style={{ fontSize: 12, marginTop: 4, opacity: .7 }}>{photo.check_id ? `Controllo ${photo.check_id}` : `Foto ${index + 1}`}</figcaption></figure> : null)}</div></section>}
             <section className="panel" style={{ marginTop: 18 }}><div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}><ShieldCheck size={24} /><p style={{ margin: 0 }}>La presente pagina verifica l'esistenza del certificato associato al codice indicato. I dati personali del proprietario non vengono pubblicati.</p></div></section>
           </>
         )}
