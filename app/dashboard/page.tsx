@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, FileCheck2, LogIn, Plus, ShieldCheck } from "lucide-react";
+import { CalendarDays, FileCheck2, LogIn, Plus, ShieldCheck, Download } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
@@ -41,9 +41,25 @@ type Booking = {
   updated_at: string;
 };
 
+type Certificate = {
+  id: string;
+  booking_id: string;
+  public_code: string;
+  vehicle_plate: string;
+  vehicle_vin: string;
+  vehicle_make: string | null;
+  vehicle_model: string | null;
+  vehicle_year: number | null;
+  vehicle_mileage: number;
+  veriscore: number;
+  workshop_id: string;
+  issued_at: string;
+};
+
 type Payload = {
   customer: { id: string; full_name: string; phone: string | null };
   bookings: Booking[];
+  certificates: Certificate[];
 };
 
 function money(cents: number) {
@@ -53,6 +69,10 @@ function money(cents: number) {
 function formatDate(value: string | null) {
   if (!value) return "Data da definire";
   return new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(`${value}T12:00:00`));
+}
+
+function formatIssuedAt(value: string) {
+  return new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(value));
 }
 
 export default function Dashboard() {
@@ -87,6 +107,12 @@ export default function Dashboard() {
       active: bookings.filter((booking) => ["requested", "assigned", "confirmed", "in_progress"].includes(booking.status)).length,
       completed: bookings.filter((booking) => booking.status === "completed").length,
     };
+  }, [data]);
+
+  const certificatesByBooking = useMemo(() => {
+    const map = new Map<string, Certificate>();
+    for (const certificate of data?.certificates ?? []) map.set(certificate.booking_id, certificate);
+    return map;
   }, [data]);
 
   return (
@@ -141,6 +167,7 @@ export default function Dashboard() {
                   <div className="customer-checks">
                     {data.bookings.map((booking) => {
                       const vehicle = [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Veicolo";
+                      const certificate = certificatesByBooking.get(booking.id);
                       return (
                         <article className="customer-check" key={booking.id}>
                           <div className="customer-check-main">
@@ -151,15 +178,51 @@ export default function Dashboard() {
                               <span>{booking.plate}</span>
                               <span>{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>
                               <span>{formatDate(booking.requested_date)} {booking.requested_slot ?? ""}</span>
+                              {certificate && <span style={{ marginTop: 4, fontWeight: 700 }}>Certificato {certificate.public_code} · VeriScore {certificate.veriscore}/100 · {formatIssuedAt(certificate.issued_at)}</span>}
                             </div>
                           </div>
                           <div className="customer-check-score">
                             <div className="small-score"><span>Stato</span><strong>{STATUS_LABELS[booking.status] ?? booking.status}</strong><em>{booking.urgency ? "Urgenza" : money(booking.customer_price_cents)}</em></div>
-                            {booking.status === "completed" && <Link className="button secondary" href={`/verifica/${booking.id}`}>Apri pratica</Link>}
+                            {booking.status === "completed" && <Link className="button secondary" href={`/verifica/${certificate?.public_code ?? booking.id}`}>Apri pratica</Link>}
                           </div>
                         </article>
                       );
                     })}
+                  </div>
+                )}
+              </section>
+
+              <section className="dashboard-section" style={{ marginTop: 12 }}>
+                <div className="section-heading">
+                  <div><div className="eyebrow">DOCUMENTI</div><h2>I miei certificati</h2></div>
+                </div>
+                {loading && <div className="notice">Caricamento certificati…</div>}
+                {!loading && (data?.certificates ?? []).length === 0 && (
+                  <div className="panel customer-info">
+                    <ShieldCheck size={28} />
+                    <div><h3>Nessun certificato ancora</h3><p>Quando una pratica VeriScore viene chiusa, il certificato apparirà automaticamente qui.</p></div>
+                  </div>
+                )}
+                {!loading && (data?.certificates ?? []).length > 0 && (
+                  <div className="customer-checks">
+                    {(data?.certificates ?? []).map((certificate) => (
+                      <article className="customer-check" key={certificate.id}>
+                        <div className="customer-check-main">
+                          <div className="vehicle-icon"><ShieldCheck size={20} /></div>
+                          <div>
+                            <strong>{[certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</strong>
+                            <span>Certificato {certificate.public_code}</span>
+                            <span>VeriScore {certificate.veriscore}/100 · {certificate.vehicle_mileage.toLocaleString("it-IT")} km</span>
+                            <span>Emesso il {formatIssuedAt(certificate.issued_at)}</span>
+                          </div>
+                        </div>
+                        <div className="customer-check-score">
+                          <div className="small-score"><span>Targa</span><strong>{certificate.vehicle_plate}</strong><em>VIN {certificate.vehicle_vin}</em></div>
+                          <Link className="button secondary" href={`/verifica/${certificate.public_code}`}><ShieldCheck size={17} /> Verifica</Link>
+                          <a className="button" href={`/api/customer/certificates/${encodeURIComponent(certificate.id)}/pdf`}><Download size={17} /> Scarica PDF</a>
+                        </div>
+                      </article>
+                    ))}
                   </div>
                 )}
               </section>
