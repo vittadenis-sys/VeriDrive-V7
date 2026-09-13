@@ -18,19 +18,10 @@ async function getCertificate(code: string) {
     veriscore: number;
     workshop_name: string | null;
     issued_at: string;
+    service?: string | null;
+    is_plus?: boolean;
+    photos?: Array<{ id: string; caption: string | null; check_id: number | null; image_url: string | null }>;
   };
-}
-
-function maskPlate(plate: string) {
-  const clean = plate.trim().toUpperCase();
-  if (clean.length <= 3) return "*".repeat(clean.length);
-  return clean.split("").map((char, index) => index === 0 || index === 2 || index === clean.length - 1 ? char : "*").join("");
-}
-
-function maskVin(vin: string) {
-  const clean = vin.trim().toUpperCase();
-  if (clean.length <= 8) return clean;
-  return `${"*".repeat(clean.length - 8)}${clean.slice(-8)}`;
 }
 
 function formatDate(value: string) {
@@ -40,12 +31,13 @@ function formatDate(value: string) {
 export default async function PublicCertificate({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const certificate = await getCertificate(code);
+  const isPlus = Boolean(certificate?.is_plus);
 
   return (
     <>
       <Header />
       <main className="page">
-        <div className="shell" style={{ maxWidth: 820 }}>
+        <div className="shell" style={{ maxWidth: 900 }}>
           <div className="eyebrow">VERIFICA CERTIFICATO VERIDRIVE</div>
           <h1 style={{ fontSize: "clamp(38px, 6vw, 60px)" }}>Verifica pubblica</h1>
 
@@ -62,20 +54,17 @@ export default async function PublicCertificate({ params }: { params: Promise<{ 
               <section className="panel customer-info" style={{ marginTop: 28 }}>
                 <div>
                   <CheckCircle2 size={34} />
-                  <div className="eyebrow" style={{ marginTop: 14 }}>CERTIFICATO AUTENTICO</div>
+                  <div className="eyebrow" style={{ marginTop: 14 }}>{isPlus ? "CERTIFICATO AUTENTICO · VERISCORE PLUS" : "CERTIFICATO AUTENTICO · VERISCORE"}</div>
                   <h2>{[certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</h2>
                   <p>{certificate.vehicle_year ?? "Anno non indicato"} · {certificate.workshop_name ?? "Officina VeriDrive"}</p>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <span className="badge">{certificate.veriscore}/100</span>
-                  <p style={{ marginBottom: 0, fontSize: 13, opacity: .75 }}>VeriScore</p>
-                </div>
+                <div style={{ textAlign: "right" }}><span className="badge">{certificate.veriscore}/100</span><p style={{ marginBottom: 0, fontSize: 13, opacity: .75 }}>VeriScore</p></div>
               </section>
 
               <section className="cards" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", marginTop: 18 }}>
                 <div className="metric"><span>Codice certificato</span><strong style={{ fontSize: 18 }}>{certificate.public_code}</strong></div>
-                <div className="metric"><span>Targa</span><strong>{maskPlate(certificate.vehicle_plate)}</strong></div>
-                <div className="metric"><span>Telaio</span><strong style={{ fontSize: 16 }}>{maskVin(certificate.vehicle_vin)}</strong></div>
+                <div className="metric"><span>Targa</span><strong>{certificate.vehicle_plate}</strong></div>
+                <div className="metric"><span>Telaio</span><strong style={{ fontSize: 16 }}>{certificate.vehicle_vin}</strong></div>
                 <div className="metric"><span>Km certificati</span><strong>{certificate.vehicle_mileage.toLocaleString("it-IT")}</strong></div>
               </section>
 
@@ -84,6 +73,20 @@ export default async function PublicCertificate({ params }: { params: Promise<{ 
                 <p style={{ marginBottom: 8 }}><b>Data verifica:</b> {formatDate(certificate.issued_at)}</p>
                 <p style={{ marginBottom: 0 }}><b>Officina:</b> {certificate.workshop_name ?? "Officina VeriDrive"}</p>
               </section>
+
+              {isPlus && (certificate.photos ?? []).length > 0 && <section className="panel" style={{ marginTop: 18 }}>
+                <div className="eyebrow">VERISCORE PLUS</div>
+                <h3>Documentazione fotografica</h3>
+                <p>Le fotografie raccolte dall'officina fanno parte della verifica Plus.</p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10, marginTop: 14 }}>
+                  {(certificate.photos ?? []).map((photo, index) => photo.image_url ? (
+                    <figure key={photo.id} style={{ margin: 0 }}>
+                      <img src={photo.image_url} alt={`Documentazione ${index + 1}`} style={{ width: "100%", aspectRatio: "4 / 3", objectFit: "cover", borderRadius: 8 }} />
+                      <figcaption style={{ fontSize: 12, marginTop: 4, opacity: .7 }}>{photo.check_id ? `Controllo ${photo.check_id}` : `Foto ${index + 1}`}</figcaption>
+                    </figure>
+                  ) : null)}
+                </div>
+              </section>}
 
               <section className="panel" style={{ marginTop: 18 }}>
                 <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -94,9 +97,7 @@ export default async function PublicCertificate({ params }: { params: Promise<{ 
             </>
           )}
 
-          <div style={{ marginTop: 24 }}>
-            <Link href="/verifica" className="button secondary">Verifica un altro certificato</Link>
-          </div>
+          <div style={{ marginTop: 24 }}><Link href="/verifica" className="button secondary">Verifica un altro certificato</Link></div>
         </div>
       </main>
       <Footer />
