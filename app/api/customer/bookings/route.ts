@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-const ROUTE_VERSION = "customer-bookings-2026-09-13-v6";
+const ROUTE_VERSION = "customer-bookings-2026-09-13-v8";
 
 function json(data: Record<string, unknown>, status = 200) {
   return NextResponse.json({ routeVersion: ROUTE_VERSION, ...data }, {
