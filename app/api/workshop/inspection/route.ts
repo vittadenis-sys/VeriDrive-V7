@@ -29,7 +29,13 @@ export async function GET(request: Request) {
     const stored = parseOverallNotes(booking.overall_notes);
     return NextResponse.json({
       booking: { id: booking.id, workshop_id: booking.workshop_id, service: booking.service, vehicle_id: booking.vehicle_id },
-      inspection: { checklist: Array.isArray(stored.checklist) ? stored.checklist : [], notes: stored.checklist_notes ?? null, passed_checks: Number(stored.passed_checks ?? 0), veriscore: Number(stored.veriscore ?? 0), completed_at: stored.completed_at ?? null },
+      inspection: {
+        checklist: Array.isArray(stored.checklist) ? stored.checklist : [],
+        notes: stored.checklist_notes ?? null,
+        passed_checks: Number(stored.passed_checks ?? 0),
+        veriscore: Number(stored.veriscore ?? 0),
+        completed_at: stored.completed_at ?? null,
+      },
     });
   } catch (error) {
     console.error("WORKSHOP_INSPECTION_GET_ERROR", error);
@@ -69,7 +75,6 @@ export async function PUT(request: Request) {
     const completedAt = body.close ? new Date().toISOString() : previousNotes.completed_at ?? null;
     const notesJson = JSON.stringify({ ...previousNotes, checklist: checklistResults, checklist_notes: String(body.notes ?? "").trim() || null, passed_checks: passedChecks, completed_checks: completedChecks, veriscore, completed_at: completedAt });
 
-    // Preserve the pre-certificate working behavior exactly for normal saves.
     if (!body.close) {
       const { error } = await db.from("bookings").update({ overall_notes: notesJson }).eq("id", bookingId).eq("workshop_id", workshop.id);
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -78,21 +83,19 @@ export async function PUT(request: Request) {
 
     if (completedChecks !== 50) return NextResponse.json({ error: "Completa tutti i 50 controlli con un esito prima di chiudere la verifica." }, { status: 400 });
 
-    const serviceKey = String(booking.service ?? "").trim();
-    const certificateService = serviceKey === "veriscore" || serviceKey === "veriscore_plus";
+    const certificateService = booking.service === "veriscore" || booking.service === "veriscore_plus";
     if (!certificateService) {
       const { error } = await db.from("bookings").update({ overall_notes: notesJson, status: "completed" }).eq("id", bookingId).eq("workshop_id", workshop.id);
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
       return NextResponse.json({ ok: true, completedChecks, passedChecks, veriscore, status: "completed" });
     }
 
-    const incomingVehicle = body.vehicle ?? {};
-    const nextPlate = String(incomingVehicle.plate ?? booking.plate ?? "").trim().toUpperCase();
-    const nextMake = String(incomingVehicle.make ?? booking.vehicle_make ?? "").trim();
-    const nextModel = String(incomingVehicle.model ?? booking.vehicle_model ?? "").trim();
-    const nextYear = incomingVehicle.year ?? booking.vehicle_year ?? null;
-    const nextVin = String(incomingVehicle.vin ?? booking.vin ?? "").trim().toUpperCase();
-    const rawMileage = incomingVehicle.mileage ?? booking.vehicle_mileage;
+    const nextPlate = String(body.vehicle?.plate ?? booking.plate ?? "").trim().toUpperCase();
+    const nextMake = String(body.vehicle?.make ?? booking.vehicle_make ?? "").trim();
+    const nextModel = String(body.vehicle?.model ?? booking.vehicle_model ?? "").trim();
+    const nextYear = body.vehicle?.year ?? booking.vehicle_year ?? null;
+    const nextVin = String(body.vehicle?.vin ?? booking.vin ?? "").trim().toUpperCase();
+    const rawMileage = body.vehicle?.mileage ?? booking.vehicle_mileage;
     const nextMileage = rawMileage === null || rawMileage === undefined || rawMileage === "" ? null : Number(rawMileage);
 
     if (!nextPlate) return NextResponse.json({ error: "Per chiudere VeriScore serve la targa." }, { status: 400 });
@@ -154,7 +157,6 @@ export async function PUT(request: Request) {
 
     const { error: statusError } = await db.from("bookings").update({ status: "completed" }).eq("id", bookingId).eq("workshop_id", workshop.id);
     if (statusError) return NextResponse.json({ error: statusError.message }, { status: 400 });
-
     return NextResponse.json({ ok: true, completedChecks, passedChecks, veriscore, status: "completed", certificate, email: emailResult });
   } catch (error) {
     console.error("WORKSHOP_INSPECTION_PUT_ERROR", error);
