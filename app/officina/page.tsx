@@ -171,9 +171,9 @@ export default function Officina() {
                     </div>
                     <div className="workshop-booking-actions">
                       <span className="badge">{STATUS_LABELS[booking.status] ?? booking.status}</span>
-                      {booking.status === "requested" && <button className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "confirmed")}>{busyId === booking.id ? "…" : "Conferma"}</button>}
-                      {booking.status === "assigned" && <button className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "confirmed")}>{busyId === booking.id ? "…" : "Conferma"}</button>}
-                      {booking.status === "confirmed" && <button className="button secondary" disabled={busyId === booking.id} onClick={() => void changeStatus(booking.id, "in_progress")}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
+                      {booking.status === "requested" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={(e) => { e.preventDefault(); void changeStatus(booking.id, "confirmed"); }}>{busyId === booking.id ? "…" : "Conferma"}</button>}
+                      {booking.status === "assigned" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={(e) => { e.preventDefault(); void changeStatus(booking.id, "confirmed"); }}>{busyId === booking.id ? "…" : "Conferma"}</button>}
+                      {booking.status === "confirmed" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={(e) => { e.preventDefault(); void changeStatus(booking.id, "in_progress"); }}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
                       {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "refunded" && <Link className="button" href={`/officina/checklist?booking=${booking.id}`}>Checklist</Link>}
                       {booking.status === "completed" && <Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Rivedi</Link>}
                       {booking.total != null && <span className="workshop-payout">€{Number(booking.total).toFixed(2).replace(".", ",")}</span>}
