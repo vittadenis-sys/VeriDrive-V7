@@ -26,7 +26,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const { data: booking } = await db.from("bookings").select("id,customer_id").eq("id", certificate.booking_id).eq("customer_id", customer.id).maybeSingle();
     if (!booking) return NextResponse.json({ error: "Certificato non associato al cliente." }, { status: 404 });
 
-    const { data: workshop } = await db.from("workshops").select("name,address,city,cap").eq("id", certificate.workshop_id).maybeSingle();
+    const { data: workshop } = await db.from("workshops").select("name,address,city,postal_code").eq("id", certificate.workshop_id).maybeSingle();
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://veridrive.it";
     const verificationUrl = `${baseUrl}/verifica/${encodeURIComponent(certificate.public_code)}`;
@@ -56,8 +56,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     pdf.text("Scansiona il QR per verificare pubblicamente il certificato.", 20, 145, { maxWidth: 170 });
     pdf.text(verificationUrl, 20, 152, { maxWidth: 170 });
 
-    const bytes = Buffer.from(pdf.output("arraybuffer"));
-    return new NextResponse(bytes, { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${certificate.public_code}.pdf"`, "Cache-Control": "private, no-store" } });
+    const arrayBuffer = pdf.output("arraybuffer");
+    return new NextResponse(new Uint8Array(arrayBuffer), { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${certificate.public_code}.pdf"`, "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("CUSTOMER_CERTIFICATE_PDF_ERROR", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Impossibile generare il certificato." }, { status: 500 });
