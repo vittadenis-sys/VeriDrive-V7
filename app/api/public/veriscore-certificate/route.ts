@@ -14,9 +14,13 @@ function maskVin(value: string) {
   return `${"*".repeat(clean.length - 8)}${clean.slice(-8)}`;
 }
 
+function normalizeCode(value: string) {
+  return value.trim().toUpperCase().replace(/\s+/g, "");
+}
+
 export async function GET(request: Request) {
   try {
-    const code = new URL(request.url).searchParams.get("code")?.trim().toUpperCase();
+    const code = normalizeCode(new URL(request.url).searchParams.get("code") ?? "");
     if (!code) return NextResponse.json({ error: "Codice certificato mancante." }, { status: 400 });
 
     const db = createServiceClient();
@@ -24,43 +28,42 @@ export async function GET(request: Request) {
       .from("veriscore_certificates")
       .select("id,public_code,booking_id,vehicle_plate,vehicle_vin,vehicle_make,vehicle_model,vehicle_year,vehicle_mileage,veriscore,workshop_id,issued_at")
       .ilike("public_code", code)
-      .maybeSingle();
-
+      .limit(2);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (!data) return NextResponse.json({ error: "Certificato non trovato." }, { status: 404 });
 
-    const { data: workshop } = await db.from("workshops").select("name").eq("id", data.workshop_id).maybeSingle();
+    const certificate = (data ?? []).find((row) => normalizeCode(String(row.public_code)) === code) ?? null;
+    if (!certificate) return NextResponse.json({ error: "Certificato non trovato." }, { status: 404 });
+
+    const { data: workshop } = await db.from("workshops").select("name").eq("id", certificate.workshop_id).maybeSingle();
     let service: string | null = null;
-    if (data.booking_id) {
-      const { data: booking } = await db.from("bookings").select("service").eq("id", data.booking_id).maybeSingle();
+    let inspectionId: string | null = null;
+    if (certificate.booking_id) {
+      const { data: booking } = await db.from("bookings").select("service").eq("id", certificate.booking_id).maybeSingle();
       service = booking?.service ?? null;
+      const { data: inspection } = await db.from("inspections").select("id").eq("booking_id", certificate.booking_id).maybeSingle();
+      inspectionId = inspection?.id ?? null;
     }
 
     let photos: Array<{ id: string; caption: string | null; check_id: number | null; image_url: string | null }> = [];
-    if (service === "veriscore_plus") {
-      const { data: rows } = await db
-        .from("photos")
-        .select("id,storage_path,caption,check_id,created_at")
-        .eq("inspection_id", data.booking_id)
-        .order("created_at", { ascending: true })
-        .limit(10);
+    if (service === "veriscore_plus" && inspectionId) {
+      const { data: rows } = await db.from("photos").select("id,storage_path,caption,check_id,created_at").eq("inspection_id", inspectionId).order("created_at", { ascending: true }).limit(10);
       photos = await Promise.all((rows ?? []).map(async (photo) => {
-        const { data: signed } = await db.storage.from("inspection-photos").createSignedUrl(photo.storage_path, 300);
+        const { data: signed } = await db.storage.from("inspection-photos").createSignedUrl(photo.storage_path, 600);
         return { id: photo.id, caption: photo.caption, check_id: photo.check_id, image_url: signed?.signedUrl ?? null };
       }));
     }
 
     return NextResponse.json({ certificate: {
-      public_code: data.public_code,
-      vehicle_plate: maskPlate(data.vehicle_plate),
-      vehicle_vin: maskVin(data.vehicle_vin),
-      vehicle_make: data.vehicle_make,
-      vehicle_model: data.vehicle_model,
-      vehicle_year: data.vehicle_year,
-      vehicle_mileage: data.vehicle_mileage,
-      veriscore: data.veriscore,
+      public_code: certificate.public_code,
+      vehicle_plate: maskPlate(certificate.vehicle_plate),
+      vehicle_vin: maskVin(certificate.vehicle_vin),
+      vehicle_make: certificate.vehicle_make,
+      vehicle_model: certificate.vehicle_model,
+      vehicle_year: certificate.vehicle_year,
+      vehicle_mileage: certificate.vehicle_mileage,
+      veriscore: certificate.veriscore,
       workshop_name: workshop?.name ?? null,
-      issued_at: data.issued_at,
+      issued_at: certificate.issued_at,
       service,
       is_plus: service === "veriscore_plus",
       photos,
