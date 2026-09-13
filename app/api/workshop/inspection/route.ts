@@ -100,7 +100,7 @@ export async function PUT(request: Request) {
 
     const { data: booking, error: bookingError } = await db
       .from("bookings")
-      .select("id,customer_id,workshop_id,status,service,overall_notes,vehicle_id")
+      .select("id,customer_id,workshop_id,status,service,overall_notes,vehicle_id,practice_code,booking_code")
       .eq("id", bookingId)
       .maybeSingle();
     if (bookingError) return NextResponse.json({ error: bookingError.message }, { status: 500 });
@@ -136,58 +136,123 @@ export async function PUT(request: Request) {
     const completedAt = body.close ? new Date().toISOString() : previousNotes.completed_at ?? null;
     const updatePayload: Record<string, unknown> = {
       overall_notes: JSON.stringify({ ...previousNotes, checklist: checklistResults, checklist_notes: String(body.notes ?? "").trim() || null, passed_checks: passedChecks, completed_checks: completedChecks, veriscore, completed_at: completedAt }),
-      status: body.close ? "completed" : booking.status,
+      status: booking.status,
+      updated_at: new Date().toISOString(),
     };
+
+    // Keep the certificate-producing transition in one controlled server flow.
+    // For a close, the inspection completion is written first; its DB trigger can
+    // then create the registry row. Booking status is set only after the certificate
+    // exists and downstream delivery has succeeded.
+    if (body.close && certificateService) {
+      const { error: notesError } = await db
+        .from("bookings")
+        .update({
+          overall_notes: updatePayload.overall_notes,
+          updated_at: updatePayload.updated_at,
+        })
+        .eq("id", bookingId)
+        .eq("workshop_id", workshop.id);
+      if (notesError) return NextResponse.json({ error: notesError.message }, { status: 400 });
+
+      let inspectionId: string | null = null;
+      const { data: existingInspection, error: inspectionReadError } = await db
+        .from("inspections")
+        .select("id,booking_id,checklist,passed_checks,veriscore,completed_at")
+        .eq("booking_id", bookingId)
+        .maybeSingle();
+      if (inspectionReadError) return NextResponse.json({ error: inspectionReadError.message }, { status: 400 });
+
+      if (existingInspection) {
+        inspectionId = existingInspection.id;
+        const { error: inspectionUpdateError } = await db
+          .from("inspections")
+          .update({
+            checklist: checklistResults,
+            passed_checks: passedChecks,
+            notes: String(body.notes ?? "").trim() || null,
+            completed_at: completedAt,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingInspection.id);
+        if (inspectionUpdateError) return NextResponse.json({ error: inspectionUpdateError.message }, { status: 400 });
+      } else {
+        const { data: createdInspection, error: inspectionInsertError } = await db
+          .from("inspections")
+          .insert({
+            booking_id: bookingId,
+            inspector_auth_id: user.id,
+            checklist: checklistResults,
+            passed_checks: passedChecks,
+            notes: String(body.notes ?? "").trim() || null,
+            completed_at: completedAt,
+            updated_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+        if (inspectionInsertError) return NextResponse.json({ error: inspectionInsertError.message }, { status: 400 });
+        inspectionId = createdInspection.id;
+      }
+
+      const { data: certificate, error: certificateReadError } = await db
+        .from("veriscore_certificates")
+        .select("id,public_code,booking_id,veriscore,issued_at,vehicle_plate,vehicle_vin,vehicle_make,vehicle_model,vehicle_year,vehicle_mileage,workshop_id")
+        .eq("booking_id", bookingId)
+        .maybeSingle();
+      if (certificateReadError) return NextResponse.json({ error: certificateReadError.message }, { status: 400 });
+      if (!certificate) {
+        return NextResponse.json({ error: "Il certificato VeriScore non è stato generato. La pratica non è stata chiusa." }, { status: 500 });
+      }
+
+      const { data: customer, error: customerError } = await db
+        .from("customers")
+        .select("auth_id,full_name")
+        .eq("id", booking.customer_id)
+        .maybeSingle();
+      if (customerError) return NextResponse.json({ error: customerError.message }, { status: 500 });
+      if (!customer?.auth_id) return NextResponse.json({ error: "Cliente non associato alla pratica." }, { status: 500 });
+
+      const { data: authUser, error: authUserError } = await db.auth.admin.getUserById(customer.auth_id);
+      if (authUserError || !authUser.user?.email) {
+        return NextResponse.json({ error: "Email cliente non disponibile: certificato creato ma pratica non chiusa." }, { status: 500 });
+      }
+
+      const emailResult = await sendCertificateIssuedEmail(authUser.user.email, {
+        publicCode: String(certificate.public_code),
+        bookingId: String(booking.practice_code ?? booking.booking_code ?? bookingId),
+        veriscore: Number(certificate.veriscore),
+        vehicleMake: certificate.vehicle_make as string | null,
+        vehicleModel: certificate.vehicle_model as string | null,
+        certificateId: String(certificate.id),
+      });
+
+      if (!emailResult.sent) {
+        return NextResponse.json({ error: emailResult.reason ?? "Invio email certificato non riuscito." }, { status: 500 });
+      }
+
+      const { error: statusError } = await db
+        .from("bookings")
+        .update({ status: "completed", updated_at: new Date().toISOString() })
+        .eq("id", bookingId)
+        .eq("workshop_id", workshop.id);
+      if (statusError) return NextResponse.json({ error: statusError.message }, { status: 400 });
+
+      return NextResponse.json({
+        ok: true,
+        completedChecks,
+        passedChecks,
+        veriscore,
+        status: "completed",
+        inspectionId,
+        certificate,
+        email: emailResult,
+      });
+    }
 
     const { error: saveError } = await db.from("bookings").update(updatePayload).eq("id", bookingId).eq("workshop_id", workshop.id);
     if (saveError) return NextResponse.json({ error: saveError.message }, { status: 400 });
 
-    let certificate: Record<string, unknown> | null = null;
-    let emailResult: unknown = null;
-    if (body.close && certificateService) {
-      const { data: existingCertificate, error: existingError } = await db.from("veriscore_certificates").select("id,public_code,booking_id,veriscore,issued_at,vehicle_plate,vehicle_vin,vehicle_make,vehicle_model,vehicle_year,vehicle_mileage,workshop_id").eq("booking_id", bookingId).maybeSingle();
-      if (existingError) return NextResponse.json({ error: existingError.message }, { status: 400 });
-
-      if (existingCertificate) {
-        certificate = existingCertificate as Record<string, unknown>;
-      } else {
-        const { data: publicCode, error: codeError } = await db.rpc("next_veriscore_certificate_code");
-        if (codeError) return NextResponse.json({ error: codeError.message }, { status: 400 });
-        const { data: createdCertificate, error: certificateError } = await db.from("veriscore_certificates").insert({
-          booking_id: bookingId,
-          public_code: publicCode,
-          vehicle_plate: nextPlate,
-          vehicle_vin: nextVin,
-          vehicle_make: nextMake || null,
-          vehicle_model: nextModel || null,
-          vehicle_year: nextYear == null || nextYear === "" ? null : Number(nextYear),
-          vehicle_mileage: Number(nextMileage),
-          veriscore,
-          workshop_id: workshop.id,
-          issued_at: completedAt,
-        }).select("id,public_code,booking_id,veriscore,issued_at,vehicle_plate,vehicle_vin,vehicle_make,vehicle_model,vehicle_year,vehicle_mileage,workshop_id").single();
-        if (certificateError) return NextResponse.json({ error: certificateError.message }, { status: 400 });
-        certificate = createdCertificate as Record<string, unknown>;
-      }
-
-      if (certificate) {
-        const { data: customer } = await db.from("customers").select("auth_id,full_name").eq("id", booking.customer_id).maybeSingle();
-        if (customer?.auth_id) {
-          const { data: authUser, error: authUserError } = await db.auth.admin.getUserById(customer.auth_id);
-          if (!authUserError && authUser.user?.email) {
-            emailResult = await sendCertificateIssuedEmail(authUser.user.email, {
-              publicCode: String(certificate.public_code),
-              bookingId: String(booking.booking_code ?? bookingId),
-              veriscore,
-              vehicleMake: certificate.vehicle_make as string | null,
-              vehicleModel: certificate.vehicle_model as string | null,
-            });
-          }
-        }
-      }
-    }
-
-    return NextResponse.json({ ok: true, completedChecks, passedChecks, veriscore, status: body.close ? "completed" : booking.status, certificate, email: emailResult });
+    return NextResponse.json({ ok: true, completedChecks, passedChecks, veriscore, status: booking.status });
   } catch (error) {
     console.error("WORKSHOP_INSPECTION_PUT_ERROR", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Errore interno." }, { status: 500 });
