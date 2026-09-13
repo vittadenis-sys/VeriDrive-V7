@@ -101,15 +101,6 @@ export default function ChecklistClient({ bookingId }: Props) {
       });
       const data = await response.json() as { error?: string; veriscore?: number };
       if (!response.ok) throw new Error(data.error ?? "Salvataggio non riuscito.");
-      if (close) {
-        const statusResponse = await fetch("/api/workshop/status", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bookingId, toStatus: "completed" }),
-        });
-        const statusData = await statusResponse.json() as { error?: string };
-        if (!statusResponse.ok) throw new Error(statusData.error ?? "Impossibile chiudere la verifica.");
-      }
       setMessage(close ? "Verifica chiusa correttamente." : `Ispezione salvata. VeriScore ${data.veriscore ?? score}/100.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Operazione non riuscita.");
@@ -130,20 +121,13 @@ export default function ChecklistClient({ bookingId }: Props) {
       <label className="full">Chilometri<input value={vehicle.mileage} type="number" min="0" step="1" inputMode="numeric" onChange={(e) => setVehicle((v) => ({ ...v, mileage: e.target.value }))} placeholder="Es. 48230" /></label>
     </div>{!hasVehicleIdentity && <p className="notice" style={{ marginTop: 12 }}>Per chiudere VeriScore o VeriScorePlus servono targa, VIN e chilometraggio.</p>}</section>}
 
-    <div className="panel" style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", marginTop: 18, marginBottom: 24 }}>
-      <VeriScore score={score} size={92} />
-      <div><p style={{ marginBottom: 6 }}><b>{score}/100</b></p><p style={{ margin: 0 }}>{completed}/{checklist.length} controlli compilati</p></div>
-    </div>
-
+    <div className="panel" style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", marginTop: 18, marginBottom: 24 }}><VeriScore score={score} size={92} /><div><p style={{ marginBottom: 6 }}><b>{score}/100</b></p><p style={{ margin: 0 }}>{completed}/{checklist.length} controlli compilati</p></div></div>
     {loading && <p className="notice" style={{ marginTop: 18 }}>Caricamento della pratica…</p>}
-    <div className="checklist" style={{ marginTop: 24 }}>
-      {checklist.map((item) => <div className="check" key={item.id} style={{ display: "block" }}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}><span style={{ minWidth: 220, flex: "1 1 260px" }}><small>{item.id}. {item.area}</small><br /><b>{item.label}</b></span><div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-        <button type="button" className={`button ${values[item.id] === "ok" ? "" : "secondary"}`} onClick={() => setResult(item.id, "ok")}>OK</button>
-        <button type="button" className={`button ${values[item.id] === "issue" ? "" : "secondary"}`} onClick={() => setResult(item.id, "issue")}>Anomalia</button>
-        <button type="button" className={`button ${values[item.id] === "critical" ? "" : "secondary"}`} onClick={() => setResult(item.id, "critical")}>Anomalia grave</button>
-      </div></div></div>)}
-    </div>
-
+    <div className="checklist" style={{ marginTop: 24 }}>{checklist.map((item) => <div className="check" key={item.id} style={{ display: "block" }}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}><span style={{ minWidth: 220, flex: "1 1 260px" }}><small>{item.id}. {item.area}</small><br /><b>{item.label}</b></span><div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+      <button type="button" className={`button ${values[item.id] === "ok" ? "" : "secondary"}`} onClick={() => setResult(item.id, "ok")}>OK</button>
+      <button type="button" className={`button ${values[item.id] === "issue" ? "" : "secondary"}`} onClick={() => setResult(item.id, "issue")}>Anomalia</button>
+      <button type="button" className={`button ${values[item.id] === "critical" ? "" : "secondary"}`} onClick={() => setResult(item.id, "critical")}>Anomalia grave</button>
+    </div></div></div>)}</div>
     <section className="panel" style={{ marginTop: 24 }}><h3>Note finali</h3><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Annotazioni del tecnico..." rows={5} style={{ width: "100%" }} /></section>
     <div className="actions" style={{ marginTop: 24 }}><button type="button" className="button" onClick={() => void saveInspection(false)} disabled={busy || loading || !completed}>Salva ispezione</button><button type="button" className="button" onClick={() => void saveInspection(true)} disabled={busy || loading || !canClose}>{isCertificateService ? "Chiudi e genera certificato" : "Chiudi verifica"}</button></div>
     {message && <p className="notice" style={{ marginTop: 16 }}>{message}</p>}
