@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 
     const { data: booking, error: bookingError } = await db
       .from("bookings")
-      .select("id,workshop_id,service,overall_notes,vehicle_id,booking_code")
+      .select("id,workshop_id,service_key,overall_notes,vehicle_id,booking_code,practice_code,plate,vehicle_make,vehicle_model,vehicle_year,vin,vehicle_mileage")
       .eq("id", bookingId)
       .maybeSingle();
     if (bookingError) return NextResponse.json({ error: bookingError.message }, { status: 500 });
@@ -54,14 +54,14 @@ export async function GET(request: Request) {
       booking: {
         id: booking.id,
         workshop_id: booking.workshop_id,
-        service: booking.service,
-        booking_code: booking.booking_code,
-        plate: String(getVehicleValue(vehicle, "plate", "registration", "license_plate", "targa") ?? ""),
-        vehicle_make: getVehicleValue(vehicle, "make", "brand", "vehicle_make", "marca"),
-        vehicle_model: getVehicleValue(vehicle, "model", "vehicle_model", "modello"),
-        vehicle_year: getVehicleValue(vehicle, "year", "vehicle_year", "anno"),
-        vin: String(getVehicleValue(vehicle, "vin", "vehicle_vin") ?? ""),
-        vehicle_mileage: getVehicleValue(vehicle, "mileage", "vehicle_mileage"),
+        service: booking.service_key,
+        booking_code: booking.booking_code ?? booking.practice_code,
+        plate: String(booking.plate ?? getVehicleValue(vehicle, "plate", "registration", "license_plate", "targa") ?? ""),
+        vehicle_make: booking.vehicle_make ?? getVehicleValue(vehicle, "make", "brand", "vehicle_make", "marca"),
+        vehicle_model: booking.vehicle_model ?? getVehicleValue(vehicle, "model", "vehicle_model", "modello"),
+        vehicle_year: booking.vehicle_year ?? getVehicleValue(vehicle, "year", "vehicle_year", "anno"),
+        vin: String(booking.vin ?? getVehicleValue(vehicle, "vin", "vehicle_vin") ?? ""),
+        vehicle_mileage: booking.vehicle_mileage ?? getVehicleValue(vehicle, "mileage", "vehicle_mileage"),
       },
       inspection: {
         checklist: Array.isArray(stored.checklist) ? stored.checklist : [],
@@ -101,7 +101,7 @@ export async function PUT(request: Request) {
 
     const { data: booking, error: bookingError } = await db
       .from("bookings")
-      .select("id,customer_id,workshop_id,status,service_key,overall_notes,vehicle_id,booking_code,plate,vehicle_make,vehicle_model,vehicle_year,vin,vehicle_mileage")
+      .select("id,customer_id,workshop_id,status,service_key,overall_notes,vehicle_id,booking_code,practice_code,plate,vehicle_make,vehicle_model,vehicle_year,vin,vehicle_mileage")
       .eq("id", bookingId)
       .maybeSingle();
     if (bookingError) return NextResponse.json({ error: bookingError.message }, { status: 500 });
@@ -219,7 +219,7 @@ export async function PUT(request: Request) {
 
       const emailResult = await sendCertificateIssuedEmail(authUser.user.email, {
         publicCode: String(certificate.public_code),
-        bookingId: String(booking.booking_code ?? bookingId),
+        bookingId: String(booking.booking_code ?? booking.practice_code ?? bookingId),
         veriscore: Number(certificate.veriscore),
         vehicleMake: certificate.vehicle_make as string | null,
         vehicleModel: certificate.vehicle_model as string | null,
@@ -237,10 +237,11 @@ export async function PUT(request: Request) {
       return NextResponse.json({ ok: true, completedChecks, passedChecks, veriscore, status: "completed", inspectionId, certificate, email: emailResult });
     }
 
-    const nonClosePayload: Record<string, unknown> = {
-      overall_notes: notesJson,
-    };
-    const { error: saveError } = await db.from("bookings").update(nonClosePayload).eq("id", bookingId).eq("workshop_id", workshop.id);
+    const { error: saveError } = await db
+      .from("bookings")
+      .update({ overall_notes: notesJson })
+      .eq("id", bookingId)
+      .eq("workshop_id", workshop.id);
     if (saveError) return NextResponse.json({ error: saveError.message }, { status: 400 });
 
     return NextResponse.json({ ok: true, completedChecks, passedChecks, veriscore, status: booking.status });
