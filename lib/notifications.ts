@@ -4,11 +4,12 @@ function getSender() {
   return process.env.EMAIL_FROM ?? "VeriDrive <prenotazioni@veridrive.it>";
 }
 
-async function sendEmail({ to, cc, subject, html }: { to: string; cc?: string[]; subject: string; html: string }) {
+async function sendEmail({ to, cc, subject, html, attachments }: { to: string; cc?: string[]; subject: string; html: string; attachments?: Array<{ filename: string; content: Buffer }> }) {
   if (!process.env.RESEND_API_KEY || !to) return { sent: false, reason: "Email non configurata" };
   const resend = new Resend(process.env.RESEND_API_KEY);
-  await resend.emails.send({ from: getSender(), to, ...(cc?.length ? { cc } : {}), subject, html });
-  return { sent: true };
+  const result = await resend.emails.send({ from: getSender(), to, ...(cc?.length ? { cc } : {}), subject, html, ...(attachments?.length ? { attachments } : {}) });
+  if (result.error) return { sent: false, reason: result.error.message, error: result.error };
+  return { sent: true, id: result.data?.id ?? null };
 }
 
 export async function sendBookingConfirmation(to: string, bookingId: string) {
@@ -70,12 +71,13 @@ export async function sendBookingOperationalNotifications(booking: {
   return results;
 }
 
-export async function sendCertificateIssuedEmail(to: string, certificate: { publicCode: string; bookingId: string; veriscore: number; vehicleMake?: string | null; vehicleModel?: string | null }) {
+export async function sendCertificateIssuedEmail(to: string, certificate: { publicCode: string; bookingId: string; veriscore: number; vehicleMake?: string | null; vehicleModel?: string | null; pdfBytes?: ArrayBuffer | Uint8Array }) {
   const customerEmail = to?.trim();
   if (!customerEmail) return { sent: false, reason: "Email cliente mancante" };
   const vehicle = [certificate.vehicleMake, certificate.vehicleModel].filter(Boolean).join(" ") || "la tua auto";
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://veridrive.it";
   const verificationUrl = `${baseUrl}/verifica/${encodeURIComponent(certificate.publicCode)}`;
   const html = `<h1>Il tuo certificato VeriScore è pronto</h1><p>La verifica della pratica <b>${certificate.bookingId}</b> è stata conclusa.</p><p>Veicolo: <b>${vehicle}</b></p><p>VeriScore: <b>${certificate.veriscore}/100</b></p><p>Il certificato digitale è ora disponibile nella tua area cliente.</p><p><a href="${verificationUrl}">Apri il certificato e verifica il codice pubblico</a></p>`;
-  return sendEmail({ to: customerEmail, subject: `Certificato VeriScore disponibile – ${certificate.publicCode}`, html });
+  const attachments = certificate.pdfBytes ? [{ filename: `${certificate.publicCode}.pdf`, content: Buffer.from(certificate.pdfBytes) }] : undefined;
+  return sendEmail({ to: customerEmail, subject: `Certificato VeriScore disponibile – ${certificate.publicCode}`, html, attachments });
 }
