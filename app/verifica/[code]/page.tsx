@@ -4,8 +4,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
 async function getCertificate(code: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const response = await fetch(`${baseUrl}/api/public/veriscore-certificate?code=${encodeURIComponent(code)}`, { cache: "no-store" });
+  const response = await fetch(`/api/public/veriscore-certificate?code=${encodeURIComponent(code)}`, { cache: "no-store" });
   if (!response.ok) return null;
   return (await response.json()).certificate as {
     public_code: string;
