@@ -8,6 +8,24 @@ async function getWorkshop(db: ReturnType<typeof createServiceClient>, userId: s
   return data;
 }
 
+async function ensureStorageBucket(db: ReturnType<typeof createServiceClient>) {
+  const bucket = "inspection-photos";
+  const { data: buckets } = await db.storage.listBuckets();
+  const exists = (buckets ?? []).some((item) => item.id === bucket || item.name === bucket);
+  if (!exists) {
+    await db.storage.createBucket(bucket, { public: false, fileSizeLimit: "8MB" });
+  }
+}
+
+async function resolveInspectionId(db: ReturnType<typeof createServiceClient>, bookingId: string, workshopId: string) {
+  const { data: booking, error: bookingError } = await db.from("bookings").select("id,workshop_id,service").eq("id", bookingId).maybeSingle();
+  if (bookingError || !booking || booking.workshop_id !== workshopId) return { booking: null, error: "Pratica non trovata." };
+  if (booking.service !== "veriscore_plus") return { booking, error: "Le foto sono disponibili solo per VeriScore Plus." };
+
+  const { data: inspection } = await db.from("inspections").select("id").eq("booking_id", bookingId).maybeSingle();
+  return { booking, inspectionId: inspection?.id ?? bookingId, error: null };
+}
+
 export async function GET(request: Request) {
   try {
     const user = await requireWorkshopOwner();
@@ -16,12 +34,14 @@ export async function GET(request: Request) {
     const db = createServiceClient();
     const workshop = await getWorkshop(db, user.id);
     if (!workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
-    const { data: booking, error: bookingError } = await db.from("bookings").select("id,workshop_id,service").eq("id", bookingId).maybeSingle();
-    if (bookingError || !booking || booking.workshop_id !== workshop.id) return NextResponse.json({ error: "Pratica non trovata." }, { status: 404 });
-    if (booking.service !== "veriscore_plus") return NextResponse.json({ photos: [] });
+    const resolved = await resolveInspectionId(db, bookingId, workshop.id);
+    if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: 404 });
 
-    const { data, error } = await db.from("photos").select("id,storage_path,caption,check_id,created_at").eq("inspection_id", bookingId).order("created_at", { ascending: true }).limit(10);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const { data, error } = await db.from("photos").select("id,storage_path,caption,check_id,created_at").eq("inspection_id", resolved.inspectionId).order("created_at", { ascending: true }).limit(10);
+    if (error) {
+      return NextResponse.json({ error: error.message, code: error.code, hint: error.hint }, { status: 500 });
+    }
+    await ensureStorageBucket(db);
     const photos = await Promise.all((data ?? []).map(async (photo) => {
       const { data: signed } = await db.storage.from("inspection-photos").createSignedUrl(photo.storage_path, 300);
       return { ...photo, preview_url: signed?.signedUrl ?? null };
@@ -43,17 +63,17 @@ export async function POST(request: Request) {
     const db = createServiceClient();
     const workshop = await getWorkshop(db, user.id);
     if (!workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
-    const { data: booking, error: bookingError } = await db.from("bookings").select("id,workshop_id,service").eq("id", bookingId).maybeSingle();
-    if (bookingError || !booking || booking.workshop_id !== workshop.id) return NextResponse.json({ error: "Pratica non trovata." }, { status: 404 });
-    if (booking.service !== "veriscore_plus") return NextResponse.json({ error: "Le foto sono disponibili solo per VeriScore Plus." }, { status: 400 });
+    const resolved = await resolveInspectionId(db, bookingId, workshop.id);
+    if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: 400 });
+    const inspectionId = resolved.inspectionId as string;
 
-    const { data: existing, error: existingError } = await db.from("photos").select("id,storage_path,caption,check_id,created_at").eq("inspection_id", bookingId).order("created_at", { ascending: true });
-    if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+    const { data: existing, error: existingError } = await db.from("photos").select("id,storage_path,caption,check_id,created_at").eq("inspection_id", inspectionId).order("created_at", { ascending: true });
+    if (existingError) return NextResponse.json({ error: existingError.message, code: existingError.code, hint: existingError.hint }, { status: 500 });
     if ((existing ?? []).length + files.length > 10) return NextResponse.json({ error: "VeriScore Plus consente esattamente 10 foto." }, { status: 400 });
 
+    await ensureStorageBucket(db);
     const created = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (const file of files) {
       if (!file.type.startsWith("image/")) return NextResponse.json({ error: "Sono consentite solo immagini." }, { status: 400 });
       if (file.size > 8 * 1024 * 1024) return NextResponse.json({ error: "Ogni foto deve essere inferiore a 8 MB." }, { status: 400 });
       const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
@@ -62,8 +82,8 @@ export async function POST(request: Request) {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const { error: uploadError } = await db.storage.from("inspection-photos").upload(storagePath, bytes, { contentType: file.type, upsert: false });
       if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
-      const { data: row, error: rowError } = await db.from("photos").insert({ inspection_id: bookingId, storage_path: storagePath, caption: null, check_id: null }).select("id,storage_path,caption,check_id,created_at").single();
-      if (rowError) return NextResponse.json({ error: rowError.message }, { status: 500 });
+      const { data: row, error: rowError } = await db.from("photos").insert({ inspection_id: inspectionId, storage_path: storagePath, caption: null, check_id: null }).select("id,storage_path,caption,check_id,created_at").single();
+      if (rowError) return NextResponse.json({ error: rowError.message, code: rowError.code, hint: rowError.hint }, { status: 500 });
       const { data: signed } = await db.storage.from("inspection-photos").createSignedUrl(storagePath, 300);
       created.push({ ...row, preview_url: signed?.signedUrl ?? null });
     }
