@@ -29,7 +29,7 @@ export async function PATCH(request: Request) {
 
     const { data: booking, error: bookingError } = await db
       .from("bookings")
-      .select("id,status,workshop_id")
+      .select("id,status,workshop_id,overall_notes")
       .eq("id", bookingId)
       .eq("workshop_id", workshop.id)
       .maybeSingle();
@@ -50,25 +50,31 @@ export async function PATCH(request: Request) {
     }
 
     if (toStatus === "completed") {
-      const { data: inspection } = await db
-        .from("inspections")
-        .select("id,passed_checks")
-        .eq("booking_id", bookingId)
-        .maybeSingle();
+      let notes: Record<string, unknown> = {};
+      if (typeof booking.overall_notes === "string") {
+        try {
+          const parsed = JSON.parse(booking.overall_notes);
+          if (parsed && typeof parsed === "object") notes = parsed as Record<string, unknown>;
+        } catch {}
+      } else if (booking.overall_notes && typeof booking.overall_notes === "object") {
+        notes = booking.overall_notes as Record<string, unknown>;
+      }
 
-      if (!inspection || inspection.passed_checks !== 50) {
+      const checklist = Array.isArray(notes.checklist) ? notes.checklist : [];
+      const completedChecks = checklist.filter((item) => item && typeof item === "object" && (item as { result?: unknown }).result).length;
+      if (completedChecks !== 50) {
         return NextResponse.json(
-          { error: "Completa tutti i 50 controlli prima di chiudere la verifica." },
+          { error: "Completa tutti i 50 controlli con un esito prima di chiudere la verifica." },
           { status: 400 }
         );
       }
 
-      const { error } = await db.rpc("close_booking_as_workshop", {
-        p_booking_id: bookingId,
-      });
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
-      }
+      const { error } = await db
+        .from("bookings")
+        .update({ status: "completed" })
+        .eq("id", bookingId)
+        .eq("workshop_id", workshop.id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     } else {
       const { error } = await db
         .from("bookings")
