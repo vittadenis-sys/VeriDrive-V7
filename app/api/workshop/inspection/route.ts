@@ -15,14 +15,29 @@ export async function GET(request: Request) {
 
     const { data: booking, error: bookingError } = await db
       .from("bookings")
-      .select("id,workshop_id,service")
+      .select("id,workshop_id,service,overall_notes")
       .eq("id", bookingId)
       .maybeSingle();
     if (bookingError) return NextResponse.json({ error: bookingError.message }, { status: 500 });
     if (!booking || booking.workshop_id !== workshop.id) return NextResponse.json({ error: "Pratica non trovata." }, { status: 404 });
 
-    // Live schema does not contain public.inspections. Checklist data is stored on bookings.overall_notes as JSON.
-    return NextResponse.json({ booking, inspection: { checklist: [], notes: null } });
+    let stored: any = {};
+    try {
+      stored = booking.overall_notes ? JSON.parse(String(booking.overall_notes)) : {};
+    } catch {
+      stored = {};
+    }
+
+    return NextResponse.json({
+      booking: { id: booking.id, workshop_id: booking.workshop_id, service: booking.service },
+      inspection: {
+        checklist: Array.isArray(stored.checklist) ? stored.checklist : [],
+        notes: stored.checklist_notes ?? null,
+        passed_checks: Number(stored.passed_checks ?? 0),
+        veriscore: Number(stored.veriscore ?? 0),
+        completed_at: stored.completed_at ?? null,
+      },
+    });
   } catch (error) {
     console.error("WORKSHOP_INSPECTION_GET_ERROR", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Errore interno." }, { status: 500 });
@@ -61,16 +76,29 @@ export async function PUT(request: Request) {
     if (!booking || booking.workshop_id !== workshop.id) return NextResponse.json({ error: "Pratica non trovata." }, { status: 404 });
 
     const results = Object.fromEntries(checklistResults.map((item) => [item.id, item.result ?? undefined]));
+    const completedChecks = checklistResults.filter((item) => item.result !== null && item.result !== undefined).length;
     const passedChecks = checklistResults.filter((item) => item.result === "ok").length;
     const veriscore = calculateWeightedVeriscore(results);
 
+    let previousNotes: Record<string, unknown> = {};
+    try {
+      previousNotes = booking.overall_notes ? JSON.parse(String(booking.overall_notes)) : {};
+    } catch {
+      previousNotes = {};
+    }
+
+    if (body.close && completedChecks !== 50) {
+      return NextResponse.json({ error: "Completa tutti i 50 controlli con un esito prima di chiudere la verifica." }, { status: 400 });
+    }
+
     const notesPayload = {
-      ...(typeof booking.overall_notes === "object" && booking.overall_notes !== null ? booking.overall_notes : {}),
+      ...previousNotes,
       checklist: checklistResults,
       checklist_notes: String(body.notes ?? "").trim() || null,
       passed_checks: passedChecks,
+      completed_checks: completedChecks,
       veriscore,
-      completed_at: body.close ? new Date().toISOString() : null,
+      completed_at: body.close ? new Date().toISOString() : previousNotes.completed_at ?? null,
     };
 
     const { error: saveError } = await db
@@ -84,11 +112,7 @@ export async function PUT(request: Request) {
 
     if (saveError) return NextResponse.json({ error: saveError.message }, { status: 400 });
 
-    if (body.close && passedChecks !== 50) {
-      return NextResponse.json({ error: "Completa tutti i 50 controlli con un esito prima di chiudere la verifica." }, { status: 400 });
-    }
-
-    return NextResponse.json({ ok: true, passedChecks, veriscore, status: body.close ? "completed" : booking.status });
+    return NextResponse.json({ ok: true, completedChecks, passedChecks, veriscore, status: body.close ? "completed" : booking.status });
   } catch (error) {
     console.error("WORKSHOP_INSPECTION_PUT_ERROR", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Errore interno." }, { status: 500 });
