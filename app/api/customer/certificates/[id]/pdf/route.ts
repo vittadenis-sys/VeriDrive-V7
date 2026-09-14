@@ -70,68 +70,53 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
     const navy = rgb("#0b1f3a"), blue = rgb("#2563eb"), cyan = rgb("#38bdf8"), pale = rgb("#f7f9fc"), text = rgb("#17233c"), muted = rgb("#64748b"), border = rgb("#e2e8f0");
 
-    // PAGE 1 — mobile-first hierarchy
-    pdf.setFillColor(...navy); pdf.rect(0, 0, W, 32, "F");
-    pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(24); pdf.text("VeriDrive", 16, 15);
-    pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.setTextColor(205, 220, 245); pdf.text(plus ? "CERTIFICATO VERISCORE PLUS" : "CERTIFICATO VERISCORE", 16, 23);
-    pdf.setFillColor(...blue); pdf.roundedRect(W - 58, 7, 42, 18, 5, 5, "F"); pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(12); pdf.text(`${certificate.veriscore}/100`, W - 37, 14.5, { align: "center" }); pdf.setFontSize(5.5); pdf.text("VERISCORE", W - 37, 21, { align: "center" });
+    // PAGE 1 — compact, readable on phone
+    pdf.setFillColor(...navy); pdf.rect(0, 0, W, 30, "F");
+    pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(24); pdf.text("VeriDrive", 16, 14);
+    pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.setTextColor(205, 220, 245); pdf.text(plus ? "CERTIFICATO VERISCORE PLUS" : "CERTIFICATO VERISCORE", 16, 22);
+    pdf.setFillColor(...blue); pdf.roundedRect(W - 64, 6, 48, 18, 5, 5, "F"); pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(13); pdf.text(`${certificate.veriscore}/100`, W - 40, 14, { align: "center" }); pdf.setFontSize(5.5); pdf.text("VERISCORE", W - 40, 20, { align: "center" });
 
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.text("CERTIFICATO UFFICIALE", 16, 43);
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(19); pdf.text(String(certificate.public_code), 16, 53);
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.text("CERTIFICATO UFFICIALE", 16, 40);
+    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(19); pdf.text(String(certificate.public_code), 16, 50);
 
-    pdf.setFillColor(...pale); pdf.roundedRect(16, 63, W - 32, 52, 6, 6, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.5); pdf.roundedRect(16, 63, W - 32, 52, 6, 6, "S");
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text("DATI DEL VEICOLO", 22, 73);
-    const d = [
-      ["Veicolo", [certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Non indicato"],
-      ["Anno", String(certificate.vehicle_year ?? "Non indicato")],
-      ["Targa", String(certificate.vehicle_plate)],
-      ["VIN / Telaio", String(certificate.vehicle_vin)],
-      ["Chilometraggio", `${Number(certificate.vehicle_mileage).toLocaleString("it-IT")} km`],
-      ["Officina", workshop?.name ?? "Officina VeriDrive"],
-    ];
-    d.forEach(([label, value], i) => {
-      const x = i % 2 === 0 ? 22 : W / 2 + 1, yy = 82 + Math.floor(i / 2) * 10;
-      pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(6.8); pdf.text(label, x, yy);
-      pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.2); pdf.text(value, x, yy + 4, { maxWidth: 72 });
-    });
+    pdf.setFillColor(...pale); pdf.roundedRect(16, 59, W - 32, 50, 6, 6, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.5); pdf.roundedRect(16, 59, W - 32, 50, 6, 6, "S");
+    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text("DATI DEL VEICOLO", 22, 69);
+    const d = [["Veicolo", [certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Non indicato"], ["Anno", String(certificate.vehicle_year ?? "Non indicato")], ["Targa", String(certificate.vehicle_plate)], ["VIN / Telaio", String(certificate.vehicle_vin)], ["Chilometraggio", `${Number(certificate.vehicle_mileage).toLocaleString("it-IT")} km`], ["Officina", workshop?.name ?? "Officina VeriDrive"]];
+    d.forEach(([label, value], i) => { const x = i % 2 === 0 ? 22 : W / 2 + 1, yy = 78 + Math.floor(i / 2) * 10; pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(6.8); pdf.text(label, x, yy); pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.2); pdf.text(value, x, yy + 4, { maxWidth: 72 }); });
 
-    pdf.setFillColor(...cyan); pdf.roundedRect(16, 123, W - 32, 12, 4, 4, "F"); pdf.setTextColor(...navy); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.5); pdf.text(plus ? "VERISCORE PLUS · VERIFICA + DOCUMENTAZIONE" : "VERIFICA TECNICA CERTIFICATA", 21, 131);
+    pdf.setFillColor(...cyan); pdf.roundedRect(16, 117, W - 32, 11, 4, 4, "F"); pdf.setTextColor(...navy); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.2); pdf.text(plus ? "VERISCORE PLUS · VERIFICA + DOCUMENTAZIONE" : "VERIFICA TECNICA CERTIFICATA", 21, 124.5);
     pdf.setTextColor(...text); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5);
     const desc = pdf.splitTextToSize(plus ? "Certificato con verifica tecnica completa e documentazione fotografica raccolta dall'officina." : "Certificato del risultato della verifica tecnica eseguita dall'officina aderente a VeriDrive.", W - 42);
-    pdf.text(desc, 21, 146);
-    const emissionY = 161; pdf.setTextColor(...muted); pdf.setFontSize(7.8); pdf.text(`Data emissione: ${new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(certificate.issued_at))}`, 21, emissionY);
-    drawGauge(pdf, 39, 183, Number(certificate.veriscore));
-    pdf.setTextColor(...muted); pdf.setFontSize(7); pdf.text("VeriScore sintetico", 39, 205, { align: "center" });
-    const qr = await QRCode.toDataURL(`${process.env.NEXT_PUBLIC_APP_URL || "https://veridrive.it"}/verifica/${encodeURIComponent(String(certificate.public_code))}`, { margin: 1, width: 192 });
-    pdf.addImage(qr, "PNG", W - 50, 177, 30, 30);
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(6); pdf.text("SCANSIONA", W - 35, 211, { align: "center" });
-    pdf.setFillColor(...navy); pdf.roundedRect(16, H - 18, W - 32, 10, 3, 3, "F"); pdf.setTextColor(255, 255, 255); pdf.setFontSize(6.8); pdf.text("veridrive.it/verifica/" + certificate.public_code, 21, H - 11.5);
+    pdf.text(desc, 21, 139);
+    pdf.setTextColor(...muted); pdf.setFontSize(7.8); pdf.text(`Data emissione: ${new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(certificate.issued_at))}`, 21, 154);
+    drawGauge(pdf, 39, 176, Number(certificate.veriscore));
+    pdf.setTextColor(...muted); pdf.setFontSize(6.5); pdf.text("VeriScore sintetico", 39, 197, { align: "center" });
+    const qr = await QRCode.toDataURL(`${process.env.NEXT_PUBLIC_APP_URL || "https://veridrive.it"}/verifica/${encodeURIComponent(String(certificate.public_code))}`, { margin: 1, width: 160 });
+    pdf.addImage(qr, "PNG", W - 47, 173, 26, 26);
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(5.8); pdf.text("SCANSIONA", W - 34, 203, { align: "center" });
+    pdf.setFillColor(...navy); pdf.roundedRect(16, H - 17, W - 32, 9, 3, 3, "F"); pdf.setTextColor(255, 255, 255); pdf.setFontSize(6.4); pdf.text("veridrive.it/verifica/" + certificate.public_code, 21, H - 11);
 
-    // PAGE 2 — readable on phone
+    // PAGE 2 — scores + up to 10 photo placeholders, compact and consistent
     pdf.addPage(); pdf.setFillColor(...navy); pdf.rect(0, 0, W, 26, "F"); pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(18); pdf.text("VeriDrive", 16, 12); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.text(plus ? "VERISCORE PLUS · SCHEDA E FOTO" : "VERISCORE · SCHEDA TECNICA", 16, 19);
     pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(13); pdf.text("Punteggi per area", 16, 40);
     let y = 50;
     for (const g of groups.slice(0, 5)) {
       const t = theme(g.pct); pdf.setFillColor(...rgb(t.pale)); pdf.roundedRect(16, y, W - 32, 14, 4, 4, "F");
-      pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.8); pdf.text(g.area, 21, y + 9);
-      pdf.setFont("helvetica", "normal"); pdf.text(`${g.ok}/${g.total}`, W - 48, y + 9); pdf.setTextColor(...rgb(t.main)); pdf.setFont("helvetica", "bold"); pdf.text(`${g.pct}%`, W - 24, y + 9); y += 18;
+      pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.8); pdf.text(g.area, 21, y + 9); pdf.setFont("helvetica", "normal"); pdf.text(`${g.ok}/${g.total}`, W - 48, y + 9); pdf.setTextColor(...rgb(t.main)); pdf.setFont("helvetica", "bold"); pdf.text(`${g.pct}%`, W - 24, y + 9); y += 18;
     }
     if (plus) {
       y += 6; pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(12); pdf.text("Documentazione fotografica · 10 foto", 16, y); y += 8;
-      const gap = 5, cellW = (W - 32 - gap) / 2, cellH = 38, cols = 2;
+      const gap = 5, cellW = (W - 32 - gap) / 2, cellH = 35, cols = 2;
       const count = Math.min(10, photos?.length ?? 0);
-      const totalRows = Math.ceil(count / cols);
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < 10; i++) {
         const row = Math.floor(i / cols), col = i % cols;
         const x = 16 + col * (cellW + gap), py = y + row * (cellH + 7);
         pdf.setFillColor(248, 250, 252); pdf.roundedRect(x, py, cellW, cellH, 4, 4, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.4); pdf.roundedRect(x, py, cellW, cellH, 4, 4, "S");
-        // Storage paths are intentionally not fetched/embedded here: this keeps the Worker under the CPU limit.
-        pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.3); pdf.text("Foto veicolo", x + cellW / 2, py + cellH / 2 - 2, { align: "center" });
-        pdf.setFont("helvetica", "bold"); pdf.setFontSize(6.5); pdf.text(`Foto ${i + 1}`, x + 2, py + cellH - 3);
+        pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.2); pdf.text(i < count ? "Foto veicolo" : "Foto non disponibile", x + cellW / 2, py + cellH / 2 - 1, { align: "center" });
+        pdf.setFont("helvetica", "bold"); pdf.setFontSize(6.4); pdf.text(`Foto ${i + 1}`, x + 2, py + cellH - 3);
       }
-      const endY = y + totalRows * (cellH + 7);
-      if (count < 10) { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(7); pdf.text(`${count}/10 foto disponibili`, 16, endY + 1); }
     }
+
     const bytes = pdf.output("arraybuffer");
     return new NextResponse(bytes, { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${certificate.public_code}${plus ? "-PLUS" : ""}.pdf"`, "Cache-Control": "private,no-store" } });
   } catch (error) {
