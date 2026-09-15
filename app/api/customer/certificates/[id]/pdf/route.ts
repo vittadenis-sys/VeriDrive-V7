@@ -159,22 +159,23 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     pdf.setTextColor(...text); pdf.setFont("helvetica", "normal"); pdf.setFontSize(12.5);
     const desc = pdf.splitTextToSize(plus ? "Verifica tecnica completa con documentazione fotografica raccolta dall'officina." : "Risultato della verifica tecnica eseguita dall'officina aderente a VeriDrive.", W - 44); pdf.text(desc, 22, 199);
 
-    const scoreCard = { x: 20, y: 207, w: 82, h: 67 };
-    pdf.setFillColor(255,255,255); pdf.roundedRect(scoreCard.x, scoreCard.y, scoreCard.w, scoreCard.h, 8, 8, "F");
-    pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(scoreCard.x, scoreCard.y, scoreCard.w, scoreCard.h, 8, 8, "S");
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text("VERISCORE", scoreCard.x + scoreCard.w/2, 218, { align: "center" });
-    drawScoreRing(pdf, 61, 240, score, false, 24);
-    pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9.5); pdf.text(st.label, 61, 267, { align: "center" });
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.5); pdf.text("Indice sintetico", 61, 272, { align: "center" });
+    const cardTop = 207, cardH = 67, scoreW = 82, gap = 6, scoreX = 20, publicX = scoreX + scoreW + gap, publicW = W - 20 - publicX;
+    pdf.setFillColor(255,255,255); pdf.roundedRect(scoreX, cardTop, scoreW, cardH, 8, 8, "F");
+    pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(scoreX, cardTop, scoreW, cardH, 8, 8, "S");
+    pdf.setFillColor(255,255,255); pdf.roundedRect(publicX, cardTop, publicW, cardH, 8, 8, "F");
+    pdf.setDrawColor(...border); pdf.roundedRect(publicX, cardTop, publicW, cardH, 8, 8, "S");
 
-    const publicCard = { x: 108, y: 207, w: W - 128, h: 67 };
-    pdf.setFillColor(255,255,255); pdf.roundedRect(publicCard.x, publicCard.y, publicCard.w, publicCard.h, 8, 8, "F");
-    pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(publicCard.x, publicCard.y, publicCard.w, publicCard.h, 8, 8, "S");
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10.5); pdf.text("VERIFICA PUBBLICA", 115, 218);
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.2); pdf.text("Scansiona il QR per verificare", 115, 225); pdf.text("l'autenticità del certificato", 115, 231);
-    const qr = await QRCode.toDataURL(`${process.env.NEXT_PUBLIC_APP_URL || "https://veridrive.it"}/verifica/${encodeURIComponent(code)}`, { margin: 1, width: 208 });
-    pdf.addImage(qr, "PNG", 152, 215, 39, 39, undefined, "FAST");
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.5); pdf.text("VERIFICA ONLINE", 171.5, 259, { align: "center" });
+    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text("VERISCORE", scoreX + scoreW/2, 218, { align: "center" });
+    drawScoreRing(pdf, scoreX + scoreW/2, 239, score, false, 20);
+    pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9.5); pdf.text(st.label, scoreX + scoreW/2, 264, { align: "center" });
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.5); pdf.text("Indice sintetico", scoreX + scoreW/2, 270, { align: "center" });
+
+    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10.5); pdf.text("VERIFICA PUBBLICA", publicX + 7, 218);
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.8); pdf.text("Scansiona il QR", publicX + 7, 225); pdf.text("per verificare l'autenticità", publicX + 7, 231);
+    const qr = await QRCode.toDataURL(`${process.env.NEXT_PUBLIC_APP_URL || "https://veridrive.it"}/verifica/${encodeURIComponent(code)}`, { margin: 1, width: 160 });
+    const qrSize = 32, qrX = publicX + publicW - qrSize - 7;
+    pdf.addImage(qr, "PNG", qrX, 224, qrSize, qrSize, undefined, "FAST");
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.2); pdf.text("VERIFICA ONLINE", qrX + qrSize/2, 260, { align: "center" });
     drawFooter(pdf, W, H, code, `1 / ${plus ? 7 : 2}`);
 
     pdf.addPage();
