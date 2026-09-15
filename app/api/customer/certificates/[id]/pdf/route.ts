@@ -44,7 +44,7 @@ function groupsOf(checklist: unknown) {
   }
   return [...out.entries()].map(([area, g]) => ({ area, ...g, pct: g.total ? Math.round(g.ok / g.total * 100) : 0 }));
 }
-async function imageData(db: ReturnType<typeof createServiceClient>, path: string) {
+async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "PNG" | "JPEG" } | null> {
   if (!path) return null;
   const { data: signed, error: signError } = await db.storage.from("inspection-photos").createSignedUrl(path, 180);
   if (signError || !signed?.signedUrl) return null;
@@ -57,7 +57,7 @@ async function imageData(db: ReturnType<typeof createServiceClient>, path: strin
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
   const contentType = response.headers.get("content-type") || "image/jpeg";
-  const format = contentType.includes("png") ? "PNG" : "JPEG";
+  const format: "PNG" | "JPEG" = contentType.includes("png") ? "PNG" : "JPEG";
   return { data: `data:${contentType};base64,${btoa(binary)}`, format };
 }
 function addImageContain(pdf: jsPDF, data: { data: string; format: "JPEG" | "PNG" }, x: number, y: number, w: number, h: number) {
@@ -107,7 +107,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const navy = rgb("#10233f"), blue = rgb("#2e5fbe"), text = rgb("#17233c"), muted = rgb("#66758a"), border = rgb("#d8e0ea"), pale = rgb("#f5f8fb");
     const st = scoreTheme(Number(certificate.veriscore));
 
-    // PAGE 1 — official certificate
     pdf.setFillColor(...navy); pdf.rect(0, 0, W, 32, "F");
     pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(25); pdf.text("VeriDrive", 16, 15);
     pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.setTextColor(205, 219, 239); pdf.text(plus ? "VERISCORE PLUS" : "VERISCORE", 16, 23);
@@ -130,7 +129,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(6); pdf.text("SCANSIONA", W - 35, 206, { align: "center" });
     pdf.setFillColor(...navy); pdf.roundedRect(16, H - 17, W - 32, 9, 3, 3, "F"); pdf.setTextColor(255, 255, 255); pdf.setFontSize(6.4); pdf.text(`veridrive.it/verifica/${certificate.public_code}`, 21, H - 11);
 
-    // PAGE 2 — technical summary
     pdf.addPage();
     sectionHeader(pdf, W, "Punteggi per area", plus ? "VERISCORE PLUS · SCHEDA TECNICA" : "VERISCORE · SCHEDA TECNICA");
     let y = 50;
@@ -145,7 +143,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(12); pdf.text("Esito della verifica", 16, Math.min(y + 9, H - 37));
     pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.text(plus ? "Documentazione fotografica nelle pagine successive." : "Il certificato riassume il risultato dei 50 controlli tecnici eseguiti dall'officina.", 16, Math.min(y + 18, H - 28));
 
-    // PLUS: exactly 5 photo pages, 2 photos per page
     if (plus) {
       const photoList = photos.slice(0, 10);
       for (let pageIndex = 0; pageIndex < 5; pageIndex++) {
@@ -154,13 +151,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
         const start = pageIndex * 2;
         for (let j = 0; j < 2; j++) {
           const idx = start + j;
-          const x = 16, py = 50 + j * 118, boxW = W - 32, boxH = 108;
-          pdf.setFillColor(...pale); pdf.roundedRect(x, py, boxW, boxH, 6, 6, "F");
-          pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(x, py, boxW, boxH, 6, 6, "S");
-          const photo = photoList[idx];
-          if (photo) {
+          const x = 16, py = 50 + j * 106, boxW = W - 32, boxH = 96;
+          pdf.setFillColor(...pale); pdf.roundedRect(x, py, boxW, boxH, 6, 6, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(x, py, boxW, boxH, 6, 6, "S");
+          if (photoList[idx]) {
             try {
-              const im = await imageData(db, String(photo.storage_path ?? ""));
+              const im = await imageData(db, String(photoList[idx].storage_path ?? ""));
               if (im) addImageContain(pdf, im, x + 3, py + 3, boxW - 6, boxH - 15);
               else { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.text("Immagine non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" }); }
             } catch {
@@ -169,8 +164,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
           } else {
             pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.text("Foto non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" });
           }
-          pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.5); pdf.text(`FOTO ${idx + 1}`, x + 5, py + boxH - 5);
-          if (photo?.caption) { pdf.setFont("helvetica", "normal"); pdf.setFontSize(7); pdf.text(String(photo.caption), x + 27, py + boxH - 5, { maxWidth: boxW - 32 }); }
+          pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.5); pdf.text(`FOTO ${idx + 1}`, x + 5, py + boxH - 6);
         }
       }
     }
