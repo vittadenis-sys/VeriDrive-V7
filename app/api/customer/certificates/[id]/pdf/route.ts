@@ -51,7 +51,7 @@ function groupsOf(checklist: unknown) {
   return [...out.entries()].map(([area, g]) => ({ area, ...g, pct: g.total ? Math.round(g.ok / g.total * 100) : 0 }));
 }
 
-async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG"; width: number; height: number } | null> {
+async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG" } | null> {
   if (!path) return null;
   const { data: signed, error: signError } = await db.storage.from("inspection-photos").createSignedUrl(path, 600);
   if (signError || !signed?.signedUrl) return null;
@@ -71,12 +71,7 @@ async function imageData(db: ReturnType<typeof createServiceClient>, path: strin
     for (let i = 0; i < bytes.length; i += chunk) {
       binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
     }
-    return {
-      data: `data:${contentType};base64,${btoa(binary)}`,
-      format: "JPEG",
-      width: 1,
-      height: 1,
-    };
+    return { data: `data:${contentType};base64,${btoa(binary)}`, format: "JPEG" };
   } catch {
     return null;
   } finally {
