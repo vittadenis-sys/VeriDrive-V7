@@ -63,8 +63,10 @@ async function imageData(db: ReturnType<typeof createServiceClient>, path: strin
 function addImageContain(pdf: jsPDF, data: { data: string; format: "JPEG" | "PNG" }, x: number, y: number, w: number, h: number) {
   const props = pdf.getImageProperties(data.data);
   const scale = Math.min(w / props.width, h / props.height);
-  const drawW = props.width * scale, drawH = props.height * scale;
-  const drawX = x + (w - drawW) / 2, drawY = y + (h - drawH) / 2;
+  const drawW = props.width * scale;
+  const drawH = props.height * scale;
+  const drawX = x + (w - drawW) / 2;
+  const drawY = y + (h - drawH) / 2;
   pdf.addImage(data.data, data.format, drawX, drawY, drawW, drawH, undefined, "FAST");
 }
 function sectionHeader(pdf: jsPDF, W: number, title: string, subtitle?: string) {
@@ -78,6 +80,18 @@ function drawFooter(pdf: jsPDF, W: number, H: number, code: string, pageLabel: s
   pdf.setFillColor(...rgb("#3A628D")); pdf.roundedRect(16, H - 15, W - 32, 7, 2.5, 2.5, "F");
   pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "normal"); pdf.setFontSize(6.8);
   pdf.text(`veridrive.it/verifica/${code}`, 21, H - 10.2); pdf.text(pageLabel, W - 21, H - 10.2, { align: "right" });
+}
+
+function extractNotes(value: unknown): string {
+  if (typeof value === "object" && value) {
+    const v = value as { checklist_notes?: unknown };
+    return typeof v.checklist_notes === "string" ? v.checklist_notes.trim() : "";
+  }
+  if (typeof value !== "string" || !value.trim()) return "";
+  try {
+    const parsed = JSON.parse(value) as { checklist_notes?: unknown };
+    return typeof parsed?.checklist_notes === "string" ? parsed.checklist_notes.trim() : "";
+  } catch { return ""; }
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -112,7 +126,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const score = Number(certificate.veriscore), st = scoreTheme(score), code = String(certificate.public_code);
     const date = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(certificate.issued_at));
 
-    // PAGE 1 — hero certificate
+    // PAGE 1 — keep all elements inside the page with clear vertical separation.
     pdf.setFillColor(...header); pdf.rect(0, 0, W, 42, "F");
     pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(36); pdf.text("VeriDrive", 16, 20);
     pdf.setFont("helvetica", "normal"); pdf.setFontSize(11); pdf.text(plus ? "CERTIFICATO VERISCORE PLUS" : "CERTIFICATO VERISCORE", 16, 31);
@@ -152,11 +166,12 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8); pdf.text("VERIFICA ONLINE", W - 43.5, 267, { align: "center" });
     drawFooter(pdf, W, H, code, `1 / ${plus ? 7 : 2}`);
 
-    // PAGE 2 — result and category scores
+    // PAGE 2 — keep notes above the footer and never overlap it.
     pdf.addPage();
     sectionHeader(pdf, W, "Risultato della verifica", plus ? "VERISCORE PLUS · SCHEDA TECNICA" : "VERISCORE · SCHEDA TECNICA");
     drawScoreRing(pdf, W / 2, 78, score);
     pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Valutazione complessiva dei 50 controlli", W / 2, 116, { align: "center" });
+
     let y = 136;
     for (const g of groups.slice(0, 5)) {
       const t = scoreTheme(g.pct), main = rgb(t.main);
@@ -167,10 +182,15 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       pdf.setFillColor(...main); pdf.roundedRect(17, y + 6, Math.max(9, (W - 34) * g.pct / 100), 9, 4.5, 4.5, "F");
       y += 28;
     }
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(15); pdf.text("Note tecniche", 17, y + 5);
-    const noteText = String((getChecklist(booking.overall_notes) && (JSON.parse(String(booking.overall_notes))?.checklist_notes ?? "")) || "").trim();
-    if (noteText) { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(11.5); pdf.text(pdf.splitTextToSize(noteText, W - 34), 17, y + 18); }
-    else { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(11.5); pdf.text("Nessuna nota aggiuntiva.", 17, y + 18); }
+
+    const noteTitleY = y + 3;
+    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(15); pdf.text("Note tecniche", 17, noteTitleY);
+    const noteText = extractNotes(booking.overall_notes);
+    const noteLines = pdf.splitTextToSize(noteText || "Nessuna nota aggiuntiva.", W - 34);
+    const noteBodyTop = noteTitleY + 13;
+    const maxNoteLines = Math.max(1, Math.floor((H - 24 - noteBodyTop) / 7));
+    const safeNoteLines = noteLines.slice(0, maxNoteLines);
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(11.5); pdf.text(safeNoteLines, 17, noteBodyTop);
     drawFooter(pdf, W, H, code, `2 / ${plus ? 7 : 2}`);
 
     if (plus) {
