@@ -15,11 +15,11 @@ function scoreTheme(score: number) {
   if (score >= 40) return { main: "#D46B27", pale: "#FFF0E5", label: "SUFFICIENTE" };
   return { main: "#BF3B3B", pale: "#FAE9E9", label: "CRITICITÀ" };
 }
-function drawScoreRing(pdf: jsPDF, cx: number, cy: number, score: number, showLabel = true) {
+function drawScoreRing(pdf: jsPDF, cx: number, cy: number, score: number, showLabel = true, radius = 29) {
   const s = Math.max(0, Math.min(100, score));
-  const t = scoreTheme(s), main = rgb(t.main), track = rgb("#DDE6EF"), r = 29;
-  pdf.setDrawColor(...track); pdf.setLineWidth(8); pdf.circle(cx, cy, r, "S");
-  pdf.setDrawColor(...main); pdf.setLineWidth(8);
+  const t = scoreTheme(s), main = rgb(t.main), track = rgb("#DDE6EF"), r = radius;
+  pdf.setDrawColor(...track); pdf.setLineWidth(r > 24 ? 8 : 6); pdf.circle(cx, cy, r, "S");
+  pdf.setDrawColor(...main); pdf.setLineWidth(r > 24 ? 8 : 6);
   const start = -Math.PI / 2;
   const end = start + Math.PI * 2 * s / 100;
   const segments = 120;
@@ -29,9 +29,9 @@ function drawScoreRing(pdf: jsPDF, cx: number, cy: number, score: number, showLa
     if (a2 <= a1) continue;
     pdf.line(cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2));
   }
-  pdf.setFillColor(255, 255, 255); pdf.circle(cx, cy, 20, "F");
-  pdf.setTextColor(...rgb("#173B6D")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(28); pdf.text(String(s), cx, cy + 4, { align: "center" });
-  pdf.setTextColor(...rgb("#64748B")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.5); pdf.text("VERISCORE", cx, cy + 12, { align: "center" });
+  pdf.setFillColor(255, 255, 255); pdf.circle(cx, cy, Math.max(15, r - 9), "F");
+  pdf.setTextColor(...rgb("#173B6D")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(r > 24 ? 28 : 24); pdf.text(String(s), cx, cy + 4, { align: "center" });
+  pdf.setTextColor(...rgb("#64748B")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(r > 24 ? 7.5 : 7); pdf.text("VERISCORE", cx, cy + 12, { align: "center" });
   if (showLabel) {
     pdf.setTextColor(...main); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text(t.label, cx, cy + r + 8, { align: "center" });
   }
@@ -158,24 +158,30 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     pdf.setTextColor(...text); pdf.setFont("helvetica", "normal"); pdf.setFontSize(12.5);
     const desc = pdf.splitTextToSize(plus ? "Verifica tecnica completa con documentazione fotografica raccolta dall'officina." : "Risultato della verifica tecnica eseguita dall'officina aderente a VeriDrive.", W - 44); pdf.text(desc, 22, 199);
 
-    pdf.setFillColor(...rgb("#FFFFFF")); pdf.roundedRect(20, 207, 82, 67, 8, 8, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(20, 207, 82, 67, 8, 8, "S");
-    drawScoreRing(pdf, 61, 232, score, false);
-    pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text(st.label, 61, 267, { align: "center" });
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9); pdf.text("Indice sintetico", 61, 272, { align: "center" });
+    const scoreCard = { x: 20, y: 207, w: 82, h: 67 };
+    pdf.setFillColor(255,255,255); pdf.roundedRect(scoreCard.x, scoreCard.y, scoreCard.w, scoreCard.h, 8, 8, "F");
+    pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(scoreCard.x, scoreCard.y, scoreCard.w, scoreCard.h, 8, 8, "S");
+    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text("VERISCORE", scoreCard.x + scoreCard.w/2, 218, { align: "center" });
+    drawScoreRing(pdf, 61, 240, score, false, 24);
+    pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9.5); pdf.text(st.label, 61, 267, { align: "center" });
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.5); pdf.text("Indice sintetico", 61, 272, { align: "center" });
 
-    pdf.setFillColor(...rgb("#FFFFFF")); pdf.roundedRect(108, 207, W - 128, 67, 8, 8, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(108, 207, W - 128, 67, 8, 8, "S");
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11); pdf.text("VERIFICA PUBBLICA", 115, 218);
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.8); pdf.text("Scansiona il QR per verificare", 115, 225); pdf.text("l'autenticità del certificato", 115, 231);
+    const publicCard = { x: 108, y: 207, w: W - 128, h: 67 };
+    pdf.setFillColor(255,255,255); pdf.roundedRect(publicCard.x, publicCard.y, publicCard.w, publicCard.h, 8, 8, "F");
+    pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(publicCard.x, publicCard.y, publicCard.w, publicCard.h, 8, 8, "S");
+    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10.5); pdf.text("VERIFICA PUBBLICA", 115, 218);
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.2); pdf.text("Scansiona il QR per verificare", 115, 225); pdf.text("l'autenticità del certificato", 115, 231);
     const qr = await QRCode.toDataURL(`${process.env.NEXT_PUBLIC_APP_URL || "https://veridrive.it"}/verifica/${encodeURIComponent(code)}`, { margin: 1, width: 208 });
     pdf.addImage(qr, "PNG", 152, 215, 39, 39, undefined, "FAST");
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.7); pdf.text("VERIFICA ONLINE", 171.5, 259, { align: "center" });
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.5); pdf.text("VERIFICA ONLINE", 171.5, 259, { align: "center" });
     drawFooter(pdf, W, H, code, `1 / ${plus ? 7 : 2}`);
 
     pdf.addPage();
     sectionHeader(pdf, W, "Risultato della verifica", plus ? "VERISCORE PLUS · SCHEDA TECNICA" : "VERISCORE · SCHEDA TECNICA");
-    pdf.setFillColor(...pale); pdf.roundedRect(18, 56, W - 36, 64, 8, 8, "F");
-    pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(18, 56, W - 36, 64, 8, 8, "S");
-    drawScoreRing(pdf, 62, 88, score, false);
+    const summaryCard = { x: 18, y: 56, w: W - 36, h: 64 };
+    pdf.setFillColor(...pale); pdf.roundedRect(summaryCard.x, summaryCard.y, summaryCard.w, summaryCard.h, 8, 8, "F");
+    pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(summaryCard.x, summaryCard.y, summaryCard.w, summaryCard.h, 8, 8, "S");
+    drawScoreRing(pdf, 62, 88, score, false, 23);
     pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(17); pdf.text(st.label, 108, 82);
     pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(17); pdf.text(`${score}/100`, 108, 98);
     pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Valutazione complessiva dei 50 controlli", 108, 109);
