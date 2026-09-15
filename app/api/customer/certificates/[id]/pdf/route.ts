@@ -15,7 +15,7 @@ function scoreTheme(score: number) {
   if (score >= 40) return { main: "#D46B27", pale: "#FFF0E5", label: "SUFFICIENTE" };
   return { main: "#BF3B3B", pale: "#FAE9E9", label: "CRITICITÀ" };
 }
-function drawScoreRing(pdf: jsPDF, cx: number, cy: number, score: number) {
+function drawScoreRing(pdf: jsPDF, cx: number, cy: number, score: number, showLabel = true) {
   const s = Math.max(0, Math.min(100, score));
   const t = scoreTheme(s), main = rgb(t.main), track = rgb("#DDE6EF"), r = 29;
   pdf.setDrawColor(...track); pdf.setLineWidth(8); pdf.circle(cx, cy, r, "S");
@@ -31,7 +31,9 @@ function drawScoreRing(pdf: jsPDF, cx: number, cy: number, score: number) {
   pdf.setFillColor(255, 255, 255); pdf.circle(cx, cy, 20, "F");
   pdf.setTextColor(...rgb("#173B6D")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(28); pdf.text(String(s), cx, cy + 4, { align: "center" });
   pdf.setTextColor(...rgb("#64748B")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.5); pdf.text("VERISCORE", cx, cy + 12, { align: "center" });
-  pdf.setTextColor(...main); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text(t.label, cx, cy + r + 12, { align: "center" });
+  if (showLabel) {
+    pdf.setTextColor(...main); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text(t.label, cx, cy + r + 6, { align: "center" });
+  }
 }
 function getChecklist(value: unknown) {
   try { const p = typeof value === "string" ? JSON.parse(value) : value; return Array.isArray(p?.checklist) ? p.checklist : []; } catch { return []; }
@@ -123,7 +125,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const score = Number(certificate.veriscore), st = scoreTheme(score), code = String(certificate.public_code);
     const date = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(certificate.issued_at));
 
-    // PAGE 1 — reserved vertical zones: header / identity / vehicle / description / score / QR / footer.
     pdf.setFillColor(...header); pdf.rect(0, 0, W, 42, "F");
     pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(36); pdf.text("VeriDrive", 16, 20);
     pdf.setFont("helvetica", "normal"); pdf.setFontSize(11); pdf.text(plus ? "CERTIFICATO VERISCORE PLUS" : "CERTIFICATO VERISCORE", 16, 31);
@@ -156,38 +157,43 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     pdf.setTextColor(...text); pdf.setFont("helvetica", "normal"); pdf.setFontSize(12.5);
     const desc = pdf.splitTextToSize(plus ? "Verifica tecnica completa con documentazione fotografica raccolta dall'officina." : "Risultato della verifica tecnica eseguita dall'officina aderente a VeriDrive.", W - 44); pdf.text(desc, 22, 199);
 
-    drawScoreRing(pdf, 58, 238, score);
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text("Indice sintetico", 58, 282, { align: "center" });
+    drawScoreRing(pdf, 58, 238, score, true);
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text("Indice sintetico", 58, 276, { align: "center" });
     const qr = await QRCode.toDataURL(`${process.env.NEXT_PUBLIC_APP_URL || "https://veridrive.it"}/verifica/${encodeURIComponent(code)}`, { margin: 1, width: 208 });
-    pdf.addImage(qr, "PNG", W - 63, 218, 39, 39, undefined, "FAST");
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8); pdf.text("VERIFICA ONLINE", W - 43.5, 266, { align: "center" });
+    pdf.addImage(qr, "PNG", W - 63, 216, 39, 39, undefined, "FAST");
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8); pdf.text("VERIFICA ONLINE", W - 43.5, 260, { align: "center" });
     drawFooter(pdf, W, H, code, `1 / ${plus ? 7 : 2}`);
 
-    // PAGE 2 — score dashboard. Keep all content in a fixed safe area above footer.
     pdf.addPage();
     sectionHeader(pdf, W, "Risultato della verifica", plus ? "VERISCORE PLUS · SCHEDA TECNICA" : "VERISCORE · SCHEDA TECNICA");
-    drawScoreRing(pdf, W / 2, 76, score);
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Valutazione complessiva dei 50 controlli", W / 2, 115, { align: "center" });
+    drawScoreRing(pdf, W / 2, 84, score, false);
+    pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(14); pdf.text(st.label, W / 2, 119, { align: "center" });
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Valutazione complessiva dei 50 controlli", W / 2, 127, { align: "center" });
 
-    let y = 134;
+    let y = 143;
     for (const g of groups.slice(0, 5)) {
       const t = scoreTheme(g.pct), main = rgb(t.main);
-      pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(15); pdf.text(g.area, 17, y);
-      pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(12); pdf.text(`${g.ok}/${g.total}`, W - 44, y, { align: "right" });
-      pdf.setTextColor(...main); pdf.setFont("helvetica", "bold"); pdf.setFontSize(15); pdf.text(`${g.pct}%`, W - 17, y, { align: "right" });
-      pdf.setFillColor(...rgb("#E5EAF0")); pdf.roundedRect(17, y + 6, W - 34, 9, 4.5, 4.5, "F");
-      pdf.setFillColor(...main); pdf.roundedRect(17, y + 6, Math.max(9, (W - 34) * g.pct / 100), 9, 4.5, 4.5, "F");
-      y += 28;
+      pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(14.5); pdf.text(g.area, 17, y);
+      pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11.5); pdf.text(`${g.ok}/${g.total}`, W - 44, y, { align: "right" });
+      pdf.setTextColor(...main); pdf.setFont("helvetica", "bold"); pdf.setFontSize(14.5); pdf.text(`${g.pct}%`, W - 17, y, { align: "right" });
+      pdf.setFillColor(...rgb("#E5EAF0")); pdf.roundedRect(17, y + 6, W - 34, 7.5, 3.75, 3.75, "F");
+      pdf.setFillColor(...main); pdf.roundedRect(17, y + 6, Math.max(7.5, (W - 34) * g.pct / 100), 7.5, 3.75, 3.75, "F");
+      y += 22;
     }
 
-    const footerTop = H - 15;
-    const notesTop = Math.min(y + 6, footerTop - 48);
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(15); pdf.text("Note tecniche", 17, notesTop);
-    const noteText = extractNotes(booking.overall_notes);
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(11.5);
-    const noteLines = pdf.splitTextToSize(noteText || "Nessuna nota aggiuntiva.", W - 34);
-    const safeNoteLines = noteLines.slice(0, 4);
-    pdf.text(safeNoteLines, 17, notesTop + 13);
+    const notesY = 244;
+    pdf.setFillColor(...pale); pdf.roundedRect(16, notesY, W - 32, 32, 6, 6, "F");
+    pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(16, notesY, W - 32, 32, 6, 6, "S");
+    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(14); pdf.text("Note tecniche", 22, notesY + 9);
+    const noteText = extractNotes(booking.overall_notes) || "Nessuna nota aggiuntiva.";
+    let noteFont = 11;
+    let noteLines = pdf.splitTextToSize(noteText, W - 44);
+    while (noteLines.length > 3 && noteFont > 8.5) {
+      noteFont -= 0.5;
+      pdf.setFontSize(noteFont);
+      noteLines = pdf.splitTextToSize(noteText, W - 44);
+    }
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(noteFont); pdf.text(noteLines.slice(0, 3), 22, notesY + 18);
     drawFooter(pdf, W, H, code, `2 / ${plus ? 7 : 2}`);
 
     if (plus) {
@@ -219,10 +225,17 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       }
     }
 
-    const bytes = pdf.output("arraybuffer");
-    return new NextResponse(bytes, { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${code}${plus ? "-PLUS" : ""}.pdf"`, "Cache-Control": "private,no-store" } });
-  } catch (error) {
-    console.error("CUSTOMER_CERTIFICATE_PDF_ERROR", error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Impossibile generare il certificato." }, { status: 500 });
+    const out = Buffer.from(pdf.output("arraybuffer"));
+    return new NextResponse(out, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="veridrive-${code}.pdf"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (e) {
+    console.error("PDF_CERTIFICATE_ERROR", e);
+    return NextResponse.json({ error: "Errore nella generazione del PDF." }, { status: 500 });
   }
 }
