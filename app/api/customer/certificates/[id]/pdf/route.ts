@@ -51,7 +51,7 @@ function groupsOf(checklist: unknown) {
   return [...out.entries()].map(([area, g]) => ({ area, ...g, pct: g.total ? Math.round(g.ok / g.total * 100) : 0 }));
 }
 
-async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG" } | null> {
+async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG"; width: number; height: number } | null> {
   if (!path) return null;
   const { data: signed, error: signError } = await db.storage.from("inspection-photos").createSignedUrl(path, 600);
   if (signError || !signed?.signedUrl) return null;
@@ -71,7 +71,7 @@ async function imageData(db: ReturnType<typeof createServiceClient>, path: strin
     for (let i = 0; i < bytes.length; i += chunk) {
       binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
     }
-    return { data: `data:${contentType};base64,${btoa(binary)}`, format: "JPEG" };
+    return { data: `data:${contentType};base64,${btoa(binary)}`, format: "JPEG", width: 1, height: 1 };
   } catch {
     return null;
   } finally {
@@ -241,28 +241,55 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
         photo,
         image: await imageData(db, String(photo.storage_path ?? "")),
       })));
-      for (let pageIndex = 0; pageIndex < 5; pageIndex++) {
+
+      const photoPages = [
+        { title: "Documentazione fotografica · 1/3", subtitle: "Foto principali del veicolo", indexes: [0, 1] },
+        { title: "Documentazione fotografica · 2/3", subtitle: "Componenti meccanici e telaio", indexes: [2, 3, 4, 5] },
+        { title: "Documentazione fotografica · 3/3", subtitle: "Dettagli e interni", indexes: [6, 7, 8, 9] },
+      ];
+
+      photoPages.forEach((page, pageIndex) => {
         pdf.addPage();
-        sectionHeader(pdf, W, `Documentazione fotografica · ${pageIndex + 1}/5`, "VERISCORE PLUS · DOCUMENTAZIONE FOTOGRAFICA");
-        const start = pageIndex * 2;
-        for (let j = 0; j < 2; j++) {
-          const idx = start + j;
-          const x = 18, py = 62 + j * 104, boxW = W - 36, boxH = 94;
-          pdf.setFillColor(...pale); pdf.roundedRect(x, py, boxW, boxH, 6, 6, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.7); pdf.roundedRect(x, py, boxW, boxH, 6, 6, "S");
-          const item = renderedPhotos[idx];
-          if (item?.image) {
-            if (!addImageContain(pdf, item.image, x + 3, py + 3, boxW - 6, boxH - 15)) {
-              pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Immagine non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" });
+        sectionHeader(pdf, W, page.title, "VERISCORE PLUS · DOCUMENTAZIONE FOTOGRAFICA");
+        pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10.5); pdf.text(page.subtitle, 18, 56);
+
+        if (pageIndex === 0) {
+          const cardX = 18, cardW = W - 36, cardH = 76;
+          page.indexes.forEach((idx, pos) => {
+            const py = 62 + pos * 82;
+            pdf.setFillColor(...pale); pdf.roundedRect(cardX, py, cardW, cardH, 6, 6, "F");
+            pdf.setDrawColor(...border); pdf.setLineWidth(0.7); pdf.roundedRect(cardX, py, cardW, cardH, 6, 6, "S");
+            const item = renderedPhotos[idx];
+            if (item?.image && addImageContain(pdf, item.image, cardX + 3, py + 3, cardW - 6, cardH - 17) === false) {
+              pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Immagine non disponibile", cardX + cardW / 2, py + cardH / 2, { align: "center" });
+            } else if (!item?.image) {
+              pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Immagine non disponibile", cardX + cardW / 2, py + cardH / 2, { align: "center" });
             }
-          } else {
-            pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Immagine non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" });
-          }
-          pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11.5); pdf.text(`FOTO ${idx + 1}`, x + 5, py + boxH - 5);
-          const caption = item?.photo.caption;
-          if (caption) { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(9.5); pdf.text(String(caption).slice(0, 70), x + 30, py + boxH - 5, { maxWidth: boxW - 36 }); }
+            pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11.5); pdf.text(`FOTO ${idx + 1}`, cardX + 5, py + cardH - 6);
+            const caption = item?.photo.caption;
+            if (caption) { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(9.5); pdf.text(String(caption).slice(0, 70), cardX + 30, py + cardH - 6, { maxWidth: cardW - 36 }); }
+          });
+        } else {
+          const marginX = 18, gap = 6, gridTop = 62, gridW = W - 36, cardW = (gridW - gap) / 2, cardH = 73;
+          page.indexes.forEach((idx, pos) => {
+            const col = pos % 2, row = Math.floor(pos / 2);
+            const x = marginX + col * (cardW + gap), y = gridTop + row * 82;
+            pdf.setFillColor(...pale); pdf.roundedRect(x, y, cardW, cardH, 6, 6, "F");
+            pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(x, y, cardW, cardH, 6, 6, "S");
+            const item = renderedPhotos[idx];
+            if (item?.image && addImageContain(pdf, item.image, x + 3, y + 3, cardW - 6, cardH - 17) === false) {
+              pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.text("Immagine non disponibile", x + cardW / 2, y + cardH / 2, { align: "center" });
+            } else if (!item?.image) {
+              pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.text("Immagine non disponibile", x + cardW / 2, y + cardH / 2, { align: "center" });
+            }
+            pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9); pdf.text(`FOTO ${idx + 1}`, x + 4, y + cardH - 5);
+            const caption = item?.photo.caption;
+            if (caption) { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.2); pdf.text(String(caption).slice(0, 42), x + 25, y + cardH - 5, { maxWidth: cardW - 29 }); }
+          });
         }
-        drawFooter(pdf, W, H, code, `${pageIndex + 3} / 7`);
-      }
+
+        drawFooter(pdf, W, H, code, `${pageIndex + 3} / 5`);
+      });
     }
 
     const out = Buffer.from(pdf.output("arraybuffer"));
