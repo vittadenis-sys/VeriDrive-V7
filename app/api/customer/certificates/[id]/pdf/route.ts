@@ -50,25 +50,27 @@ function groupsOf(checklist: unknown) {
   }
   return [...out.entries()].map(([area, g]) => ({ area, ...g, pct: g.total ? Math.round(g.ok / g.total * 100) : 0 }));
 }
-async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG"; width: number; height: number } | null> {
+
+async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG" } | null> {
   if (!path) return null;
-  const { data: signed, error: signError } = await db.storage.from("inspection-photos").createSignedUrl(path, 600);
+  const bucket = db.storage.from("inspection-photos");
+  const { data: signed, error: signError } = await bucket.createSignedUrl(path, 600);
   if (signError || !signed?.signedUrl) return null;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
   try {
     const response = await fetch(signed.signedUrl, { cache: "no-store", signal: controller.signal });
     if (!response.ok) return null;
     const contentType = (response.headers.get("content-type") || "image/jpeg").toLowerCase();
     if (!contentType.startsWith("image/")) return null;
     const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength > 2_500_000) return null;
+    if (bytes.byteLength > 4_000_000) return null;
     let binary = "";
     const chunk = 0x8000;
     for (let i = 0; i < bytes.length; i += chunk) {
       binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
     }
-    return { data: `data:${contentType};base64,${btoa(binary)}`, format: "JPEG", width: 1, height: 1 };
+    return { data: `data:${contentType};base64,${btoa(binary)}`, format: "JPEG" };
   } catch {
     return null;
   } finally {
@@ -83,9 +85,7 @@ function addImageContain(pdf: jsPDF, data: { data: string; format: "JPEG" }, x: 
     const drawX = x + (w - drawW) / 2, drawY = y + (h - drawH) / 2;
     pdf.addImage(data.data, data.format, drawX, drawY, drawW, drawH, undefined, "FAST");
     return true;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 function sectionHeader(pdf: jsPDF, W: number, title: string, subtitle?: string) {
   const header = rgb("#3A628D");
@@ -100,15 +100,9 @@ function drawFooter(pdf: jsPDF, W: number, H: number, code: string, pageLabel: s
   pdf.text(`veridrive.it/verifica/${code}`, 23, H - 10.2); pdf.text(pageLabel, W - 23, H - 10.2, { align: "right" });
 }
 function extractNotes(value: unknown): string {
-  if (typeof value === "object" && value) {
-    const v = value as { checklist_notes?: unknown };
-    return typeof v.checklist_notes === "string" ? v.checklist_notes.trim() : "";
-  }
+  if (typeof value === "object" && value) { const v = value as { checklist_notes?: unknown }; return typeof v.checklist_notes === "string" ? v.checklist_notes.trim() : ""; }
   if (typeof value !== "string" || !value.trim()) return "";
-  try {
-    const parsed = JSON.parse(value) as { checklist_notes?: unknown };
-    return typeof parsed?.checklist_notes === "string" ? parsed.checklist_notes.trim() : "";
-  } catch { return ""; }
+  try { const parsed = JSON.parse(value) as { checklist_notes?: unknown }; return typeof parsed?.checklist_notes === "string" ? parsed.checklist_notes.trim() : ""; } catch { return ""; }
 }
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -131,60 +125,48 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     if (plus) {
       const { data: inspection } = await db.from("inspections").select("id").eq("booking_id", certificate.booking_id).maybeSingle();
       if (inspection?.id) {
-        const { data } = await db.from("photos").select("id,storage_path,caption,check_id,created_at").eq("inspection_id", inspection.id).order("created_at", { ascending: true }).limit(10);
+        const { data } = await db.from("photos").select("id,storage_path,caption,check_id,created_at").eq("inspection_id", inspection.id).not("storage_path", "is", null).order("created_at", { ascending: true }).limit(10);
         photos = data ?? [];
       }
     }
+    const photoList = plus ? photos.slice(0,10) : [];
+    const renderedPhotos = await Promise.all(photoList.map(async photo => ({ photo, image: await imageData(db, String(photo.storage_path ?? "")) })));
+
     const pdf = new jsPDF({ unit: "mm", format: "a4", compress: true });
     const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
     const text = rgb("#173B6D"), muted = rgb("#5D7188"), border = rgb("#D5DFEA"), pale = rgb("#F6F9FC"), header = rgb("#3A628D"), accent = rgb("#4E86BE");
     const score = Number(certificate.veriscore), st = scoreTheme(score), code = String(certificate.public_code);
+    const date = new Intl.DateTimeFormat("it-IT", { day:"2-digit", month:"long", year:"numeric" }).format(new Date(certificate.issued_at));
 
-    pdf.setFillColor(...header); pdf.rect(0, 0, W, 42, "F");
-    pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(36); pdf.text("VeriDrive", 16, 20);
-    pdf.setFont("helvetica", "normal"); pdf.setFontSize(11); pdf.text(plus ? "CERTIFICATO VERISCORE PLUS" : "CERTIFICATO VERISCORE", 16, 31);
-    pdf.setFillColor(...rgb(st.pale)); pdf.roundedRect(W - 78, 6, 62, 30, 7, 7, "F");
-    pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(22); pdf.text(`${score}/100`, W - 47, 19, { align: "center" });
-    pdf.setFontSize(7.5); pdf.text("VALUTAZIONE", W - 47, 28, { align: "center" });
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11.5); pdf.text("CERTIFICATO UFFICIALE", 16, 56);
-    pdf.setTextColor(...text); pdf.setFontSize(34); pdf.text(code, 16, 72);
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10.5); pdf.text(`Data emissione: ${new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(certificate.issued_at))}`, 16, 82);
-    pdf.setFillColor(...pale); pdf.roundedRect(16, 92, W - 32, 74, 8, 8, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.7); pdf.roundedRect(16, 92, W - 32, 74, 8, 8, "S");
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(16); pdf.text("DATI DEL VEICOLO", 23, 108);
-    const d = [["MARCA E MODELLO", [certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Non indicato"], ["ANNO", String(certificate.vehicle_year ?? "Non indicato")], ["TARGA", String(certificate.vehicle_plate)], ["VIN / TELAIO", String(certificate.vehicle_vin)], ["CHILOMETRAGGIO", `${Number(certificate.vehicle_mileage).toLocaleString("it-IT")} km`], ["OFFICINA", workshop?.name ?? "Officina VeriDrive"]];
-    d.forEach(([label, value], i) => { const x = i % 2 === 0 ? 23 : W / 2 + 3, yy = 122 + Math.floor(i / 2) * 15; pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9); pdf.text(label, x, yy); pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(14.5); pdf.text(String(value), x, yy + 6.5, { maxWidth: 70 }); });
-    pdf.setFillColor(...accent); pdf.roundedRect(16, 175, W - 32, 13, 4, 4, "F");
-    pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9.7); pdf.text(plus ? "VERISCORE PLUS · VERIFICA + DOCUMENTAZIONE" : "VERIFICA TECNICA CERTIFICATA", 22, 184);
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "normal"); pdf.setFontSize(12.5); pdf.text(pdf.splitTextToSize(plus ? "Verifica tecnica completa con documentazione fotografica raccolta dall'officina." : "Risultato della verifica tecnica eseguita dall'officina aderente a VeriDrive.", W - 44), 22, 199);
-    const cardTop = 207, cardH = 67, scoreW = 82, gap = 6, scoreX = 20, publicX = scoreX + scoreW + gap, publicW = W - 20 - publicX;
-    pdf.setFillColor(255,255,255); pdf.roundedRect(scoreX, cardTop, scoreW, cardH, 8, 8, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(scoreX, cardTop, scoreW, cardH, 8, 8, "S");
-    pdf.setFillColor(255,255,255); pdf.roundedRect(publicX, cardTop, publicW, cardH, 8, 8, "F"); pdf.setDrawColor(...border); pdf.roundedRect(publicX, cardTop, publicW, cardH, 8, 8, "S");
-    const scoreCx = scoreX + scoreW / 2;
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text("VERISCORE", scoreCx, 216, { align: "center" }); drawScoreRing(pdf, scoreCx, 240, score, false, 17);
-    pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9.5); pdf.text(st.label, scoreCx, 265, { align: "center" }); pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.5); pdf.text("Indice sintetico", scoreCx, 272, { align: "center" });
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10.5); pdf.text("VERIFICA PUBBLICA", publicX + 7, 218); pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.8); pdf.text("Scansiona il QR", publicX + 7, 225); pdf.text("per verificare l'autenticità", publicX + 7, 231);
-    const qr = await QRCode.toDataURL(`${process.env.NEXT_PUBLIC_APP_URL || "https://veridrive.it"}/verifica/${encodeURIComponent(code)}`, { margin: 1, width: 160 }); const qrSize = 28, qrX = publicX + (publicW - qrSize) / 2; pdf.addImage(qr, "PNG", qrX, 238, qrSize, qrSize, undefined, "FAST"); pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.2); pdf.text("VERIFICA ONLINE", qrX + qrSize / 2, 270, { align: "center" }); drawFooter(pdf, W, H, code, `1 / ${plus ? 5 : 2}`);
-    pdf.addPage();
-    sectionHeader(pdf, W, "Risultato della verifica", plus ? "VERISCORE PLUS · SCHEDA TECNICA" : "VERISCORE · SCHEDA TECNICA");
-    const summaryCard = { x: 18, y: 56, w: W - 36, h: 64 }; pdf.setFillColor(...pale); pdf.roundedRect(summaryCard.x, summaryCard.y, summaryCard.w, summaryCard.h, 8, 8, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(summaryCard.x, summaryCard.y, summaryCard.w, summaryCard.h, 8, 8, "S"); drawScoreRing(pdf, 62, 88, score, false, 23); pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(17); pdf.text(st.label, 108, 82); pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(17); pdf.text(`${score}/100`, 108, 98); pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Valutazione complessiva dei 50 controlli", 108, 109);
-    let y = 132; for (const g of groups.slice(0,5)) { const t=scoreTheme(g.pct), main=rgb(t.main); pdf.setTextColor(...text); pdf.setFont("helvetica","bold"); pdf.setFontSize(14.5); pdf.text(g.area,18,y); pdf.setTextColor(...muted); pdf.setFont("helvetica","bold"); pdf.setFontSize(11.5); pdf.text(`${g.ok}/${g.total}`,W-45,y,{align:"right"}); pdf.setTextColor(...main); pdf.setFont("helvetica","bold"); pdf.setFontSize(14.5); pdf.text(`${g.pct}%`,W-18,y,{align:"right"}); pdf.setFillColor(...rgb("#E5EAF0")); pdf.roundedRect(18,y+6,W-36,7.5,3.75,3.75,"F"); pdf.setFillColor(...main); pdf.roundedRect(18,y+6,Math.max(7.5,(W-36)*g.pct/100),7.5,3.75,3.75,"F"); y += 21; }
-    const notesY=242; pdf.setFillColor(...pale); pdf.roundedRect(18,notesY,W-36,34,6,6,"F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.6); pdf.roundedRect(18,notesY,W-36,34,6,6,"S"); pdf.setTextColor(...text); pdf.setFont("helvetica","bold"); pdf.setFontSize(14); pdf.text("Note tecniche",24,notesY+9); const noteText=extractNotes(booking.overall_notes)||"Nessuna nota aggiuntiva."; let noteFont=11; let noteLines=pdf.splitTextToSize(noteText,W-48); while(noteLines.length>3&&noteFont>8.5){noteFont-=0.5;pdf.setFontSize(noteFont);noteLines=pdf.splitTextToSize(noteText,W-48);} pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(noteFont);pdf.text(noteLines.slice(0,3),24,notesY+18); drawFooter(pdf,W,H,code,`2 / ${plus ? 5 : 2}`);
-    if (plus) {
-      const photoList = photos.slice(0,10);
-      const renderedPhotos = await Promise.all(photoList.map(async photo => ({ photo, image: await imageData(db, String(photo.storage_path ?? "")) })));
-      const photoPages = [{ subtitle:"Foto principali del veicolo", indexes:[0,1] }, { subtitle:"Componenti meccanici e telaio", indexes:[2,3,4,5] }, { subtitle:"Dettagli e interni", indexes:[6,7,8,9] }];
+    pdf.setFillColor(...header); pdf.rect(0,0,W,42,"F");
+    pdf.setTextColor(255,255,255); pdf.setFont("helvetica","bold"); pdf.setFontSize(36); pdf.text("VeriDrive",16,20);
+    pdf.setFont("helvetica","normal"); pdf.setFontSize(11); pdf.text(plus ? "CERTIFICATO VERISCORE PLUS" : "CERTIFICATO VERISCORE",16,31);
+    pdf.setFillColor(...rgb(st.pale)); pdf.roundedRect(W-78,6,62,30,7,7,"F"); pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica","bold"); pdf.setFontSize(22); pdf.text(`${score}/100`,W-47,19,{align:"center"}); pdf.setFontSize(7.5); pdf.text("VALUTAZIONE",W-47,28,{align:"center"});
+    pdf.setTextColor(...muted); pdf.setFont("helvetica","bold"); pdf.setFontSize(11.5); pdf.text("CERTIFICATO UFFICIALE",16,56); pdf.setTextColor(...text); pdf.setFontSize(34); pdf.text(code,16,72); pdf.setTextColor(...muted); pdf.setFont("helvetica","normal"); pdf.setFontSize(10.5); pdf.text(`Data emissione: ${date}`,16,82);
+    pdf.setFillColor(...pale); pdf.roundedRect(16,92,W-32,74,8,8,"F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.7); pdf.roundedRect(16,92,W-32,74,8,8,"S"); pdf.setTextColor(...text); pdf.setFont("helvetica","bold"); pdf.setFontSize(16); pdf.text("DATI DEL VEICOLO",23,108);
+    const d=[["MARCA E MODELLO",[certificate.vehicle_make,certificate.vehicle_model].filter(Boolean).join(" ")||"Non indicato"],["ANNO",String(certificate.vehicle_year??"Non indicato")],["TARGA",String(certificate.vehicle_plate)],["VIN / TELAIO",String(certificate.vehicle_vin)],["CHILOMETRAGGIO",`${Number(certificate.vehicle_mileage).toLocaleString("it-IT")} km`],["OFFICINA",workshop?.name??"Officina VeriDrive"]];
+    d.forEach(([label,value],i)=>{const x=i%2===0?23:W/2+3,yy=122+Math.floor(i/2)*15; pdf.setTextColor(...muted);pdf.setFont("helvetica","bold");pdf.setFontSize(9);pdf.text(label,x,yy);pdf.setTextColor(...text);pdf.setFont("helvetica","bold");pdf.setFontSize(14.5);pdf.text(String(value),x,yy+6.5,{maxWidth:70});});
+    pdf.setFillColor(...accent);pdf.roundedRect(16,175,W-32,13,4,4,"F");pdf.setTextColor(255,255,255);pdf.setFont("helvetica","bold");pdf.setFontSize(9.7);pdf.text(plus?"VERISCORE PLUS · VERIFICA + DOCUMENTAZIONE":"VERIFICA TECNICA CERTIFICATA",22,184);pdf.setTextColor(...text);pdf.setFont("helvetica","normal");pdf.setFontSize(12.5);const desc=pdf.splitTextToSize(plus?"Verifica tecnica completa con documentazione fotografica raccolta dall'officina.":"Risultato della verifica tecnica eseguita dall'officina aderente a VeriDrive.",W-44);pdf.text(desc,22,199);
+    const cardTop=207,cardH=67,scoreW=82,gap=6,scoreX=20,publicX=scoreX+scoreW+gap,publicW=W-20-publicX;pdf.setFillColor(255,255,255);pdf.roundedRect(scoreX,cardTop,scoreW,cardH,8,8,"F");pdf.setDrawColor(...border);pdf.setLineWidth(0.6);pdf.roundedRect(scoreX,cardTop,scoreW,cardH,8,8,"S");pdf.setFillColor(255,255,255);pdf.roundedRect(publicX,cardTop,publicW,cardH,8,8,"F");pdf.setDrawColor(...border);pdf.roundedRect(publicX,cardTop,publicW,cardH,8,8,"S");
+    const scoreCx=scoreX+scoreW/2;pdf.setTextColor(...text);pdf.setFont("helvetica","bold");pdf.setFontSize(10);pdf.text("VERISCORE",scoreCx,216,{align:"center"});drawScoreRing(pdf,scoreCx,240,score,false,17);pdf.setTextColor(...rgb(st.main));pdf.setFont("helvetica","bold");pdf.setFontSize(9.5);pdf.text(st.label,scoreCx,265,{align:"center"});pdf.setTextColor(...muted);pdf.setFont("helvetica","bold");pdf.setFontSize(8.5);pdf.text("Indice sintetico",scoreCx,272,{align:"center"});
+    pdf.setTextColor(...text);pdf.setFont("helvetica","bold");pdf.setFontSize(10.5);pdf.text("VERIFICA PUBBLICA",publicX+7,218);pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(7.8);pdf.text("Scansiona il QR",publicX+7,225);pdf.text("per verificare l'autenticità",publicX+7,231);const qr=await QRCode.toDataURL(`${process.env.NEXT_PUBLIC_APP_URL||"https://veridrive.it"}/verifica/${encodeURIComponent(code)}`,{margin:1,width:160});const qrSize=28,qrX=publicX+(publicW-qrSize)/2;pdf.addImage(qr,"PNG",qrX,238,qrSize,qrSize,undefined,"FAST");pdf.setTextColor(...muted);pdf.setFont("helvetica","bold");pdf.setFontSize(7.2);pdf.text("VERIFICA ONLINE",qrX+qrSize/2,270,{align:"center"});drawFooter(pdf,W,H,code,`1 / ${plus?5:2}`);
+    pdf.addPage();sectionHeader(pdf,W,"Risultato della verifica",plus?"VERISCORE PLUS · SCHEDA TECNICA":"VERISCORE · SCHEDA TECNICA");const summaryCard={x:18,y:56,w:W-36,h:64};pdf.setFillColor(...pale);pdf.roundedRect(summaryCard.x,summaryCard.y,summaryCard.w,summaryCard.h,8,8,"F");pdf.setDrawColor(...border);pdf.setLineWidth(0.6);pdf.roundedRect(summaryCard.x,summaryCard.y,summaryCard.w,summaryCard.h,8,8,"S");drawScoreRing(pdf,62,88,score,false,23);pdf.setTextColor(...rgb(st.main));pdf.setFont("helvetica","bold");pdf.setFontSize(17);pdf.text(st.label,108,82);pdf.setTextColor(...text);pdf.setFont("helvetica","bold");pdf.setFontSize(17);pdf.text(`${score}/100`,108,98);pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(10);pdf.text("Valutazione complessiva dei 50 controlli",108,109);
+    let y=132;for(const g of groups.slice(0,5)){const t=scoreTheme(g.pct),main=rgb(t.main);pdf.setTextColor(...text);pdf.setFont("helvetica","bold");pdf.setFontSize(14.5);pdf.text(g.area,18,y);pdf.setTextColor(...muted);pdf.setFont("helvetica","bold");pdf.setFontSize(11.5);pdf.text(`${g.ok}/${g.total}`,W-45,y,{align:"right"});pdf.setTextColor(...main);pdf.setFont("helvetica","bold");pdf.setFontSize(14.5);pdf.text(`${g.pct}%`,W-18,y,{align:"right"});pdf.setFillColor(...rgb("#E5EAF0"));pdf.roundedRect(18,y+6,W-36,7.5,3.75,3.75,"F");pdf.setFillColor(...main);pdf.roundedRect(18,y+6,Math.max(7.5,(W-36)*g.pct/100),7.5,3.75,3.75,"F");y+=21;}
+    const notesY=242;pdf.setFillColor(...pale);pdf.roundedRect(18,notesY,W-36,34,6,6,"F");pdf.setDrawColor(...border);pdf.setLineWidth(0.6);pdf.roundedRect(18,notesY,W-36,34,6,6,"S");pdf.setTextColor(...text);pdf.setFont("helvetica","bold");pdf.setFontSize(14);pdf.text("Note tecniche",24,notesY+9);const noteText=extractNotes(booking.overall_notes)||"Nessuna nota aggiuntiva.";let noteFont=11;let noteLines=pdf.splitTextToSize(noteText,W-48);while(noteLines.length>3&&noteFont>8.5){noteFont-=0.5;pdf.setFontSize(noteFont);noteLines=pdf.splitTextToSize(noteText,W-48);}pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(noteFont);pdf.text(noteLines.slice(0,3),24,notesY+18);drawFooter(pdf,W,H,code,`2 / ${plus?5:2}`);
+    if(plus){
+      const photoPages=[{subtitle:"Foto principali del veicolo",indexes:[0,1]},{subtitle:"Componenti meccanici e telaio",indexes:[2,3,4,5]},{subtitle:"Dettagli e interni",indexes:[6,7,8,9]}];
       photoPages.forEach((page,pageIndex)=>{
-        pdf.addPage(); sectionHeader(pdf,W,`Documentazione fotografica · ${pageIndex+1}/3`,"VERISCORE PLUS · DOCUMENTAZIONE FOTOGRAFICA"); pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(10.5);pdf.text(page.subtitle,18,56);
+        pdf.addPage();sectionHeader(pdf,W,`Documentazione fotografica · ${pageIndex+1}/3`,"VERISCORE PLUS · DOCUMENTAZIONE FOTOGRAFICA");pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(10.5);pdf.text(page.subtitle,18,56);
         if(pageIndex===0){
-          const gap=7, margin=18, totalW=W-36, cardW=(totalW-gap)/2, cardH=172, top=64;
-          page.indexes.forEach((idx,pos)=>{ const x=margin+pos*(cardW+gap), y=top; pdf.setFillColor(...pale);pdf.roundedRect(x,y,cardW,cardH,6,6,"F");pdf.setDrawColor(...border);pdf.setLineWidth(0.7);pdf.roundedRect(x,y,cardW,cardH,6,6,"S"); const item=renderedPhotos[idx]; if(item?.image) addImageContain(pdf,item.image,x+4,y+4,cardW-8,cardH-28); else {pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(9);pdf.text("Immagine non disponibile",x+cardW/2,y+cardH/2,{align:"center"});} pdf.setTextColor(...text);pdf.setFont("helvetica","bold");pdf.setFontSize(10);pdf.text(`FOTO ${idx+1}`,x+5,y+cardH-10); const caption=item?.photo.caption; if(caption){pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.text(String(caption).slice(0,45),x+28,y+cardH-10,{maxWidth:cardW-34});}});
+          const gap=7,margin=18,top=64,totalW=W-36,cardW=(totalW-gap)/2,cardH=172;
+          page.indexes.forEach((idx,pos)=>{const x=margin+pos*(cardW+gap),y=top;pdf.setFillColor(...pale);pdf.roundedRect(x,y,cardW,cardH,6,6,"F");pdf.setDrawColor(...border);pdf.setLineWidth(0.7);pdf.roundedRect(x,y,cardW,cardH,6,6,"S");const item=renderedPhotos[idx];if(item?.image)addImageContain(pdf,item.image,x+4,y+4,cardW-8,cardH-28);else{pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(9);pdf.text("Immagine non disponibile",x+cardW/2,y+cardH/2,{align:"center"});}pdf.setTextColor(...text);pdf.setFont("helvetica","bold");pdf.setFontSize(10);pdf.text(`FOTO ${idx+1}`,x+5,y+cardH-10);const caption=item?.photo.caption;if(caption){pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.text(String(caption).slice(0,45),x+28,y+cardH-10,{maxWidth:cardW-34});}});
         } else {
-          const margin=18,gap=6,totalW=W-36,cardW=(totalW-gap)/2,cardH=82,top=62;
-          page.indexes.forEach((idx,pos)=>{ const col=pos%2,row=Math.floor(pos/2),x=margin+col*(cardW+gap),y=top+row*91; pdf.setFillColor(...pale);pdf.roundedRect(x,y,cardW,cardH,6,6,"F");pdf.setDrawColor(...border);pdf.setLineWidth(0.6);pdf.roundedRect(x,y,cardW,cardH,6,6,"S"); const item=renderedPhotos[idx]; if(item?.image) addImageContain(pdf,item.image,x+3,y+3,cardW-6,cardH-18); else {pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(8.5);pdf.text("Immagine non disponibile",x+cardW/2,y+cardH/2,{align:"center"});} pdf.setTextColor(...text);pdf.setFont("helvetica","bold");pdf.setFontSize(8.8);pdf.text(`FOTO ${idx+1}`,x+4,y+cardH-5); const caption=item?.photo.caption; if(caption){pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(7);pdf.text(String(caption).slice(0,38),x+24,y+cardH-5,{maxWidth:cardW-28});}});
+          const margin=18,gap=6,gridTop=62,gridW=W-36,cardW=(gridW-gap)/2,cardH=82;
+          page.indexes.forEach((idx,pos)=>{const col=pos%2,row=Math.floor(pos/2),x=margin+col*(cardW+gap),y=gridTop+row*91;pdf.setFillColor(...pale);pdf.roundedRect(x,y,cardW,cardH,6,6,"F");pdf.setDrawColor(...border);pdf.setLineWidth(0.6);pdf.roundedRect(x,y,cardW,cardH,6,6,"S");const item=renderedPhotos[idx];if(item?.image)addImageContain(pdf,item.image,x+3,y+3,cardW-6,cardH-18);else{pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(8.5);pdf.text("Immagine non disponibile",x+cardW/2,y+cardH/2,{align:"center"});}pdf.setTextColor(...text);pdf.setFont("helvetica","bold");pdf.setFontSize(8.8);pdf.text(`FOTO ${idx+1}`,x+4,y+cardH-5);const caption=item?.photo.caption;if(caption){pdf.setTextColor(...muted);pdf.setFont("helvetica","normal");pdf.setFontSize(7);pdf.text(String(caption).slice(0,38),x+24,y+cardH-5,{maxWidth:cardW-28});}});
         }
         drawFooter(pdf,W,H,code,`${pageIndex+3} / 5`);
       });
     }
-    const out=Buffer.from(pdf.output("arraybuffer")); return new NextResponse(out,{status:200,headers:{"Content-Type":"application/pdf","Content-Disposition":`inline; filename="veridrive-${code}.pdf"`,"Cache-Control":"no-store"}});
-  } catch(e) { console.error("PDF_CERTIFICATE_ERROR",e); return NextResponse.json({error:"Errore nella generazione del PDF."},{status:500}); }
+    const out=Buffer.from(pdf.output("arraybuffer"));return new NextResponse(out,{status:200,headers:{"Content-Type":"application/pdf","Content-Disposition":`inline; filename="veridrive-${code}.pdf"`,"Cache-Control":"no-store"}});
+  }catch(e){console.error("PDF_CERTIFICATE_ERROR",e);return NextResponse.json({error:"Errore nella generazione del PDF."},{status:500});}
 }
