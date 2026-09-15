@@ -51,7 +51,7 @@ function groupsOf(checklist: unknown) {
   return [...out.entries()].map(([area, g]) => ({ area, ...g, pct: g.total ? Math.round(g.ok / g.total * 100) : 0 }));
 }
 
-async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG"; width: number; height: number } | null> {
+async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG" } | null> {
   if (!path) return null;
   const { data: signed, error: signError } = await db.storage.from("inspection-photos").createSignedUrl(path, 600);
   if (signError || !signed?.signedUrl) return null;
@@ -71,7 +71,7 @@ async function imageData(db: ReturnType<typeof createServiceClient>, path: strin
     for (let i = 0; i < bytes.length; i += chunk) {
       binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
     }
-    return { data: `data:${contentType};base64,${btoa(binary)}`, format: "JPEG", width: 1, height: 1 };
+    return { data: `data:${contentType};base64,${btoa(binary)}`, format: "JPEG" };
   } catch {
     return null;
   } finally {
@@ -197,7 +197,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const qrSize = 28, qrX = publicX + (publicW - qrSize) / 2;
     pdf.addImage(qr, "PNG", qrX, 238, qrSize, qrSize, undefined, "FAST");
     pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.2); pdf.text("VERIFICA ONLINE", qrX + qrSize / 2, 270, { align: "center" });
-    drawFooter(pdf, W, H, code, `1 / ${plus ? 7 : 2}`);
+    drawFooter(pdf, W, H, code, `1 / ${plus ? 5 : 2}`);
 
     pdf.addPage();
     sectionHeader(pdf, W, "Risultato della verifica", plus ? "VERISCORE PLUS · SCHEDA TECNICA" : "VERISCORE · SCHEDA TECNICA");
@@ -233,7 +233,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       noteLines = pdf.splitTextToSize(noteText, W - 48);
     }
     pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(noteFont); pdf.text(noteLines.slice(0, 3), 24, notesY + 18);
-    drawFooter(pdf, W, H, code, `2 / ${plus ? 7 : 2}`);
+    drawFooter(pdf, W, H, code, `2 / ${plus ? 5 : 2}`);
 
     if (plus) {
       const photoList = photos.slice(0, 10);
@@ -241,18 +241,15 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
         photo,
         image: await imageData(db, String(photo.storage_path ?? "")),
       })));
-
       const photoPages = [
         { title: "Documentazione fotografica · 1/3", subtitle: "Foto principali del veicolo", indexes: [0, 1] },
         { title: "Documentazione fotografica · 2/3", subtitle: "Componenti meccanici e telaio", indexes: [2, 3, 4, 5] },
         { title: "Documentazione fotografica · 3/3", subtitle: "Dettagli e interni", indexes: [6, 7, 8, 9] },
       ];
-
       photoPages.forEach((page, pageIndex) => {
         pdf.addPage();
         sectionHeader(pdf, W, page.title, "VERISCORE PLUS · DOCUMENTAZIONE FOTOGRAFICA");
         pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10.5); pdf.text(page.subtitle, 18, 56);
-
         if (pageIndex === 0) {
           const cardX = 18, cardW = W - 36, cardH = 76;
           page.indexes.forEach((idx, pos) => {
@@ -287,7 +284,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
             if (caption) { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(7.2); pdf.text(String(caption).slice(0, 42), x + 25, y + cardH - 5, { maxWidth: cardW - 29 }); }
           });
         }
-
         drawFooter(pdf, W, H, code, `${pageIndex + 3} / 5`);
       });
     }
