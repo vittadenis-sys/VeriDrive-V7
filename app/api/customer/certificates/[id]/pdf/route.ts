@@ -18,8 +18,9 @@ function scoreTheme(score: number) {
 function drawScoreRing(pdf: jsPDF, cx: number, cy: number, score: number, showLabel = true, radius = 29) {
   const s = Math.max(0, Math.min(100, score));
   const t = scoreTheme(s), main = rgb(t.main), track = rgb("#DDE6EF"), r = radius;
-  pdf.setDrawColor(...track); pdf.setLineWidth(r > 24 ? 8 : 6); pdf.circle(cx, cy, r, "S");
-  pdf.setDrawColor(...main); pdf.setLineWidth(r > 24 ? 8 : 6);
+  const lineWidth = r > 24 ? 7.2 : 5.8;
+  pdf.setDrawColor(...track); pdf.setLineWidth(lineWidth); pdf.circle(cx, cy, r, "S");
+  pdf.setDrawColor(...main); pdf.setLineWidth(lineWidth);
   const start = -Math.PI / 2;
   const end = start + Math.PI * 2 * s / 100;
   const segments = 120;
@@ -29,9 +30,9 @@ function drawScoreRing(pdf: jsPDF, cx: number, cy: number, score: number, showLa
     if (a2 <= a1) continue;
     pdf.line(cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2));
   }
-  pdf.setFillColor(255, 255, 255); pdf.circle(cx, cy, Math.max(15, r - 9), "F");
-  pdf.setTextColor(...rgb("#173B6D")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(r > 24 ? 28 : 24); pdf.text(String(s), cx, cy + 4, { align: "center" });
-  pdf.setTextColor(...rgb("#64748B")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(r > 24 ? 7.5 : 7); pdf.text("VERISCORE", cx, cy + 12, { align: "center" });
+  pdf.setFillColor(255, 255, 255); pdf.circle(cx, cy, Math.max(14, r - 8), "F");
+  pdf.setTextColor(...rgb("#173B6D")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(r > 24 ? 25 : 21); pdf.text(String(s), cx, cy + 4, { align: "center" });
+  pdf.setTextColor(...rgb("#64748B")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(r > 24 ? 7.2 : 6.5); pdf.text("VERISCORE", cx, cy + 12, { align: "center" });
   if (showLabel) {
     pdf.setTextColor(...main); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text(t.label, cx, cy + r + 8, { align: "center" });
   }
