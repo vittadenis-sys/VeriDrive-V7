@@ -52,18 +52,18 @@ function groupsOf(checklist: unknown) {
 }
 async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG" } | null> {
   if (!path) return null;
-  const { data: signed, error: signError } = await db.storage.from("inspection-photos").createSignedUrl(path, 180);
+  const { data: signed, error: signError } = await db.storage.from("inspection-photos").createSignedUrl(path, 300);
   if (signError || !signed?.signedUrl) return null;
   const response = await fetch(signed.signedUrl, { cache: "no-store" });
   if (!response.ok) return null;
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > 1_200_000) return null;
   const contentType = response.headers.get("content-type") || "image/jpeg";
-  if (!contentType.includes("jpeg") && !contentType.includes("jpg")) return null;
+  if (!contentType.includes("image/")) return null;
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength > 1_500_000) return null;
   let binary = "";
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
-  return { data: `data:image/jpeg;base64,${btoa(binary)}`, format: "JPEG" };
+  return { data: `data:${contentType};base64,${btoa(binary)}`, format: "JPEG" };
 }
 function addImageContain(pdf: jsPDF, data: { data: string; format: "JPEG" }, x: number, y: number, w: number, h: number) {
   const props = pdf.getImageProperties(data.data);
