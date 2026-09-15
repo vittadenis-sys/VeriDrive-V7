@@ -50,27 +50,51 @@ function groupsOf(checklist: unknown) {
   }
   return [...out.entries()].map(([area, g]) => ({ area, ...g, pct: g.total ? Math.round(g.ok / g.total * 100) : 0 }));
 }
-async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG" } | null> {
+
+async function imageData(db: ReturnType<typeof createServiceClient>, path: string): Promise<{ data: string; format: "JPEG"; width: number; height: number } | null> {
   if (!path) return null;
-  const { data: signed, error: signError } = await db.storage.from("inspection-photos").createSignedUrl(path, 300);
+  const { data: signed, error: signError } = await db.storage.from("inspection-photos").createSignedUrl(path, 600);
   if (signError || !signed?.signedUrl) return null;
-  const response = await fetch(signed.signedUrl, { cache: "no-store" });
-  if (!response.ok) return null;
-  const contentType = response.headers.get("content-type") || "image/jpeg";
-  if (!contentType.includes("image/")) return null;
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > 1_500_000) return null;
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
-  return { data: `data:${contentType};base64,${btoa(binary)}`, format: "JPEG" };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(signed.signedUrl, { cache: "no-store", signal: controller.signal });
+    if (!response.ok) return null;
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    if (!contentType.toLowerCase().startsWith("image/")) return null;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength > 2_500_000) return null;
+
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+    }
+    return {
+      data: `data:${contentType};base64,${btoa(binary)}`,
+      format: "JPEG",
+      width: 1,
+      height: 1,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
+
 function addImageContain(pdf: jsPDF, data: { data: string; format: "JPEG" }, x: number, y: number, w: number, h: number) {
-  const props = pdf.getImageProperties(data.data);
-  const scale = Math.min(w / props.width, h / props.height);
-  const drawW = props.width * scale, drawH = props.height * scale;
-  const drawX = x + (w - drawW) / 2, drawY = y + (h - drawH) / 2;
-  pdf.addImage(data.data, data.format, drawX, drawY, drawW, drawH, undefined, "FAST");
+  try {
+    const props = pdf.getImageProperties(data.data);
+    const scale = Math.min(w / props.width, h / props.height);
+    const drawW = props.width * scale, drawH = props.height * scale;
+    const drawX = x + (w - drawW) / 2, drawY = y + (h - drawH) / 2;
+    pdf.addImage(data.data, data.format, drawX, drawY, drawW, drawH, undefined, "FAST");
+    return true;
+  } catch {
+    return false;
+  }
 }
 function sectionHeader(pdf: jsPDF, W: number, title: string, subtitle?: string) {
   const header = rgb("#3A628D");
@@ -218,6 +242,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
     if (plus) {
       const photoList = photos.slice(0, 10);
+      const renderedPhotos = await Promise.all(photoList.map(async (photo) => ({
+        photo,
+        image: await imageData(db, String(photo.storage_path ?? "")),
+      })));
       for (let pageIndex = 0; pageIndex < 5; pageIndex++) {
         pdf.addPage();
         sectionHeader(pdf, W, `Documentazione fotografica · ${pageIndex + 1}/5`, "VERISCORE PLUS · DOCUMENTAZIONE FOTOGRAFICA");
@@ -226,19 +254,16 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
           const idx = start + j;
           const x = 18, py = 62 + j * 104, boxW = W - 36, boxH = 94;
           pdf.setFillColor(...pale); pdf.roundedRect(x, py, boxW, boxH, 6, 6, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.7); pdf.roundedRect(x, py, boxW, boxH, 6, 6, "S");
-          if (photoList[idx]) {
-            try {
-              const im = await imageData(db, String(photoList[idx].storage_path ?? ""));
-              if (im) addImageContain(pdf, im, x + 3, py + 3, boxW - 6, boxH - 15);
-              else { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Immagine non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" }); }
-            } catch {
+          const item = renderedPhotos[idx];
+          if (item?.image) {
+            if (!addImageContain(pdf, item.image, x + 3, py + 3, boxW - 6, boxH - 15)) {
               pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Immagine non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" });
             }
           } else {
-            pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Foto non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" });
+            pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Immagine non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" });
           }
           pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11.5); pdf.text(`FOTO ${idx + 1}`, x + 5, py + boxH - 5);
-          const caption = photoList[idx]?.caption;
+          const caption = item?.photo.caption;
           if (caption) { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(9.5); pdf.text(String(caption).slice(0, 70), x + 30, py + boxH - 5, { maxWidth: boxW - 36 }); }
         }
         drawFooter(pdf, W, H, code, `${pageIndex + 3} / 7`);
