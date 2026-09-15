@@ -15,17 +15,23 @@ function scoreTheme(score: number) {
   if (score >= 40) return { main: "#D46B27", pale: "#FFF0E5", label: "SUFFICIENTE" };
   return { main: "#BF3B3B", pale: "#FAE9E9", label: "CRITICITÀ" };
 }
-function drawScoreBand(pdf: jsPDF, x: number, y: number, w: number, h: number, score: number) {
+function drawScoreRing(pdf: jsPDF, cx: number, cy: number, score: number) {
   const s = Math.max(0, Math.min(100, score));
-  const t = scoreTheme(s), main = rgb(t.main), track = rgb("#DDE6EF");
-  const radius = h / 2;
-  pdf.setFillColor(...track); pdf.roundedRect(x, y, w, h, radius, radius, "F");
-  pdf.setFillColor(...main);
-  const fillW = Math.max(h, w * (s / 100));
-  pdf.roundedRect(x, y, Math.min(w, fillW), h, radius, radius, "F");
-  pdf.setFillColor(255, 255, 255); pdf.circle(x + Math.min(w - radius, fillW - radius), y + radius, Math.max(0.8, radius - 1.4), "F");
-  pdf.setTextColor(...main); pdf.setFont("helvetica", "bold"); pdf.setFontSize(28); pdf.text(`${s}/100`, x + 6, y + h - 6);
-  pdf.setFont("helvetica", "bold"); pdf.setFontSize(9); pdf.text(t.label, x + w - 8, y + h - 8, { align: "right" });
+  const t = scoreTheme(s), main = rgb(t.main), track = rgb("#DDE6EF"), r = 29;
+  pdf.setDrawColor(...track); pdf.setLineWidth(8); pdf.circle(cx, cy, r, "S");
+  pdf.setDrawColor(...main); pdf.setLineWidth(8);
+  const end = -Math.PI / 2 + Math.PI * 2 * s / 100;
+  const steps = Math.max(1, Math.ceil(60 * s / 100));
+  for (let i = 0; i < steps; i++) {
+    const a1 = -Math.PI / 2 + Math.PI * 2 * i / 60;
+    const a2 = Math.min(end, -Math.PI / 2 + Math.PI * 2 * (i + 0.9) / 60);
+    if (a2 <= a1) continue;
+    pdf.line(cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2));
+  }
+  pdf.setFillColor(255, 255, 255); pdf.circle(cx, cy, 20, "F");
+  pdf.setTextColor(...rgb("#173B6D")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(28); pdf.text(String(s), cx, cy + 4, { align: "center" });
+  pdf.setTextColor(...rgb("#64748B")); pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.5); pdf.text("VERISCORE", cx, cy + 12, { align: "center" });
+  pdf.setTextColor(...main); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text(t.label, cx, cy + r + 12, { align: "center" });
 }
 function getChecklist(value: unknown) {
   try { const p = typeof value === "string" ? JSON.parse(value) : value; return Array.isArray(p?.checklist) ? p.checklist : []; } catch { return []; }
@@ -102,25 +108,26 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
     const pdf = new jsPDF({ unit: "mm", format: "a4", compress: true });
     const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
-    const text = rgb("#24405F"), muted = rgb("#64748B"), border = rgb("#D9E3ED"), pale = rgb("#F7FAFC"), header = rgb("#3A628D"), accent = rgb("#4E86BE");
+    const text = rgb("#173B6D"), muted = rgb("#5D7188"), border = rgb("#D5DFEA"), pale = rgb("#F6F9FC"), header = rgb("#3A628D"), accent = rgb("#4E86BE");
     const score = Number(certificate.veriscore), st = scoreTheme(score), code = String(certificate.public_code);
-    const date = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(certificate.issued_at));
+    const date = new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(certificate.issued_at));
 
     // PAGE 1 — hero certificate
-    pdf.setFillColor(...header); pdf.rect(0, 0, W, 40, "F");
-    pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(33); pdf.text("VeriDrive", 16, 18);
-    pdf.setFont("helvetica", "normal"); pdf.setFontSize(10.5); pdf.text(plus ? "CERTIFICATO VERISCORE PLUS" : "CERTIFICATO VERISCORE", 16, 29);
-    pdf.setFillColor(...rgb(st.pale)); pdf.roundedRect(W - 76, 6, 60, 28, 7, 7, "F");
-    pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(20); pdf.text(`${score}/100`, W - 46, 18, { align: "center" });
-    pdf.setFontSize(7); pdf.text("VALUTAZIONE", W - 46, 27, { align: "center" });
+    pdf.setFillColor(...header); pdf.rect(0, 0, W, 42, "F");
+    pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(36); pdf.text("VeriDrive", 16, 20);
+    pdf.setFont("helvetica", "normal"); pdf.setFontSize(11); pdf.text(plus ? "CERTIFICATO VERISCORE PLUS" : "CERTIFICATO VERISCORE", 16, 31);
+    pdf.setFillColor(...rgb(st.pale)); pdf.roundedRect(W - 78, 6, 62, 30, 7, 7, "F");
+    pdf.setTextColor(...rgb(st.main)); pdf.setFont("helvetica", "bold"); pdf.setFontSize(22); pdf.text(`${score}/100`, W - 47, 19, { align: "center" });
+    pdf.setFontSize(7.5); pdf.text("VALUTAZIONE", W - 47, 28, { align: "center" });
 
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11); pdf.text("CERTIFICATO UFFICIALE", 16, 53);
-    pdf.setTextColor(...text); pdf.setFontSize(31); pdf.text(code, 16, 68);
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11.5); pdf.text("CERTIFICATO UFFICIALE", 16, 56);
+    pdf.setTextColor(...text); pdf.setFontSize(34); pdf.text(code, 16, 72);
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10.5); pdf.text(`Data emissione: ${date}`, 16, 82);
 
-    pdf.setFillColor(...pale); pdf.roundedRect(16, 78, W - 32, 70, 8, 8, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.7); pdf.roundedRect(16, 78, W - 32, 70, 8, 8, "S");
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(16); pdf.text("DATI DEL VEICOLO", 23, 93);
+    pdf.setFillColor(...pale); pdf.roundedRect(16, 92, W - 32, 74, 8, 8, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.7); pdf.roundedRect(16, 92, W - 32, 74, 8, 8, "S");
+    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(16); pdf.text("DATI DEL VEICOLO", 23, 108);
     const d = [
-      ["VEICOLO", [certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Non indicato"],
+      ["MARCA E MODELLO", [certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Non indicato"],
       ["ANNO", String(certificate.vehicle_year ?? "Non indicato")],
       ["TARGA", String(certificate.vehicle_plate)],
       ["VIN / TELAIO", String(certificate.vehicle_vin)],
@@ -128,64 +135,68 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       ["OFFICINA", workshop?.name ?? "Officina VeriDrive"],
     ];
     d.forEach(([label, value], i) => {
-      const x = i % 2 === 0 ? 23 : W / 2 + 2, yy = 106 + Math.floor(i / 2) * 14;
-      pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8.8); pdf.text(label, x, yy);
-      pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(14); pdf.text(String(value), x, yy + 6.5, { maxWidth: 72 });
+      const x = i % 2 === 0 ? 23 : W / 2 + 3, yy = 122 + Math.floor(i / 2) * 15;
+      pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9); pdf.text(label, x, yy);
+      pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(14.5); pdf.text(String(value), x, yy + 6.5, { maxWidth: 70 });
     });
 
-    pdf.setFillColor(...accent); pdf.roundedRect(16, 157, W - 32, 13, 4, 4, "F");
-    pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9.4); pdf.text(plus ? "VERISCORE PLUS · VERIFICA + DOCUMENTAZIONE" : "VERIFICA TECNICA CERTIFICATA", 22, 166);
+    pdf.setFillColor(...accent); pdf.roundedRect(16, 175, W - 32, 13, 4, 4, "F");
+    pdf.setTextColor(255, 255, 255); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9.7); pdf.text(plus ? "VERISCORE PLUS · VERIFICA + DOCUMENTAZIONE" : "VERIFICA TECNICA CERTIFICATA", 22, 184);
     pdf.setTextColor(...text); pdf.setFont("helvetica", "normal"); pdf.setFontSize(12.5);
-    const desc = pdf.splitTextToSize(plus ? "Verifica tecnica completa con documentazione fotografica raccolta dall'officina." : "Risultato della verifica tecnica eseguita dall'officina aderente a VeriDrive.", W - 44); pdf.text(desc, 22, 181);
-    pdf.setTextColor(...muted); pdf.setFontSize(10.5); pdf.text(`Data emissione: ${date}`, 22, 199);
+    const desc = pdf.splitTextToSize(plus ? "Verifica tecnica completa con documentazione fotografica raccolta dall'officina." : "Risultato della verifica tecnica eseguita dall'officina aderente a VeriDrive.", W - 44); pdf.text(desc, 22, 199);
 
-    drawScoreBand(pdf, 22, 214, 88, 30, score);
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(9); pdf.text("VERISCORE", 23, 252);
-    const qr = await QRCode.toDataURL(`${process.env.NEXT_PUBLIC_APP_URL || "https://veridrive.it"}/verifica/${encodeURIComponent(code)}`, { margin: 1, width: 192 });
-    pdf.addImage(qr, "PNG", W - 63, 208, 37, 37, undefined, "FAST");
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8); pdf.text("VERIFICA ONLINE", W - 44.5, 251, { align: "center" });
+    drawScoreRing(pdf, 58, 236, score);
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.text("Indice sintetico", 58, 284, { align: "center" });
+    const qr = await QRCode.toDataURL(`${process.env.NEXT_PUBLIC_APP_URL || "https://veridrive.it"}/verifica/${encodeURIComponent(code)}`, { margin: 1, width: 208 });
+    pdf.addImage(qr, "PNG", W - 63, 220, 39, 39, undefined, "FAST");
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(8); pdf.text("VERIFICA ONLINE", W - 43.5, 267, { align: "center" });
     drawFooter(pdf, W, H, code, `1 / ${plus ? 7 : 2}`);
 
     // PAGE 2 — result and category scores
     pdf.addPage();
     sectionHeader(pdf, W, "Risultato della verifica", plus ? "VERISCORE PLUS · SCHEDA TECNICA" : "VERISCORE · SCHEDA TECNICA");
-    drawScoreBand(pdf, 16, 57, W - 32, 36, score);
-    let y = 108;
-    for (const g of groups.slice(0, 6)) {
-      const t = scoreTheme(g.pct), main = rgb(t.main), bg = rgb(t.pale);
-      pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(13.5); pdf.text(g.area, 17, y);
-      pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11); pdf.text(`${g.ok}/${g.total}`, W - 43, y, { align: "right" });
-      pdf.setTextColor(...main); pdf.setFont("helvetica", "bold"); pdf.setFontSize(13); pdf.text(`${g.pct}%`, W - 17, y, { align: "right" });
-      pdf.setFillColor(...rgb("#E5EAF0")); pdf.roundedRect(17, y + 5, W - 34, 9, 4.5, 4.5, "F");
-      pdf.setFillColor(...main); pdf.roundedRect(17, y + 5, Math.max(9, (W - 34) * g.pct / 100), 9, 4.5, 4.5, "F");
+    drawScoreRing(pdf, W / 2, 78, score);
+    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Valutazione complessiva dei 50 controlli", W / 2, 116, { align: "center" });
+    let y = 136;
+    for (const g of groups.slice(0, 5)) {
+      const t = scoreTheme(g.pct), main = rgb(t.main);
+      pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(15); pdf.text(g.area, 17, y);
+      pdf.setTextColor(...muted); pdf.setFont("helvetica", "bold"); pdf.setFontSize(12); pdf.text(`${g.ok}/${g.total}`, W - 44, y, { align: "right" });
+      pdf.setTextColor(...main); pdf.setFontSize(15); pdf.text(`${g.pct}%`, W - 17, y, { align: "right" });
+      pdf.setFillColor(...rgb("#E5EAF0")); pdf.roundedRect(17, y + 6, W - 34, 9, 4.5, 4.5, "F");
+      pdf.setFillColor(...main); pdf.roundedRect(17, y + 6, Math.max(9, (W - 34) * g.pct / 100), 9, 4.5, 4.5, "F");
       y += 28;
     }
-    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(16); pdf.text("Esito della verifica", 16, Math.min(y + 6, H - 48));
-    pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(12); pdf.text(plus ? "Documentazione fotografica nelle pagine successive." : "Il certificato riassume il risultato dei 50 controlli tecnici eseguiti dall'officina.", 16, Math.min(y + 18, H - 33));
+    pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(15); pdf.text("Note tecniche", 17, y + 5);
+    const noteText = String((getChecklist(booking.overall_notes) && (JSON.parse(String(booking.overall_notes))?.checklist_notes ?? "")) || "").trim();
+    if (noteText) { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(11.5); pdf.text(pdf.splitTextToSize(noteText, W - 34), 17, y + 18); }
+    else { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(11.5); pdf.text("Nessuna nota aggiuntiva.", 17, y + 18); }
     drawFooter(pdf, W, H, code, `2 / ${plus ? 7 : 2}`);
 
     if (plus) {
       const photoList = photos.slice(0, 10);
       for (let pageIndex = 0; pageIndex < 5; pageIndex++) {
         pdf.addPage();
-        sectionHeader(pdf, W, `Documentazione fotografica · ${pageIndex + 1}/5`, "VERISCORE PLUS · FOTO DEL VEICOLO");
+        sectionHeader(pdf, W, `Documentazione fotografica · ${pageIndex + 1}/5`, "VERISCORE PLUS · DOCUMENTAZIONE FOTOGRAFICA");
         const start = pageIndex * 2;
         for (let j = 0; j < 2; j++) {
-          const idx = start + j, x = 16, py = 52 + j * 106, boxW = W - 32, boxH = 96;
+          const idx = start + j;
+          const x = 16, py = 62 + j * 104, boxW = W - 32, boxH = 94;
           pdf.setFillColor(...pale); pdf.roundedRect(x, py, boxW, boxH, 6, 6, "F"); pdf.setDrawColor(...border); pdf.setLineWidth(0.7); pdf.roundedRect(x, py, boxW, boxH, 6, 6, "S");
           if (photoList[idx]) {
             try {
               const im = await imageData(db, String(photoList[idx].storage_path ?? ""));
               if (im) addImageContain(pdf, im, x + 3, py + 3, boxW - 6, boxH - 15);
-              else { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(11); pdf.text("Immagine non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" }); }
+              else { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Immagine non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" }); }
             } catch {
-              pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(11); pdf.text("Immagine non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" });
+              pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Immagine non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" });
             }
           } else {
-            pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(11); pdf.text("Foto non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" });
+            pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.text("Foto non disponibile", x + boxW / 2, py + boxH / 2, { align: "center" });
           }
-          pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11); pdf.text(`FOTO ${idx + 1}`, x + 5, py + boxH - 6);
-          if (photoList[idx]?.caption) { pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.text(String(photoList[idx].caption), x + 34, py + boxH - 6, { maxWidth: boxW - 39 }); }
+          pdf.setTextColor(...text); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11.5); pdf.text(`FOTO ${idx + 1}`, x + 5, py + boxH - 5);
+          const caption = photoList[idx]?.caption;
+          if (caption) { pdf.setTextColor(...muted); pdf.setFont("helvetica", "normal"); pdf.setFontSize(9.5); pdf.text(String(caption).slice(0, 70), x + 30, py + boxH - 5, { maxWidth: boxW - 36 }); }
         }
         drawFooter(pdf, W, H, code, `${pageIndex + 3} / 7`);
       }
