@@ -78,6 +78,29 @@ export default function ChecklistClient({ bookingId }: Props) {
     setMessage("");
   }
 
+  async function compressPhoto(file: File): Promise<File> {
+    const maxSide = 1280;
+    const quality = 0.72;
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return file;
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close();
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (!blob) return file;
+      return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+    } catch {
+      return file;
+    }
+  }
+
   async function uploadPhotos(files: FileList | null) {
     if (!files || files.length === 0 || !isPlus || photoBusy) return;
     const remaining = Math.max(0, 4 - photos.length);
@@ -87,14 +110,16 @@ export default function ChecklistClient({ bookingId }: Props) {
     setPhotoBusy(true);
     try {
       let currentPhotos = photos;
-      for (const file of selected) {
+      for (const original of selected) {
+        const file = await compressPhoto(original);
         const form = new FormData();
         form.set("bookingId", bookingId);
-        form.append("photos", file);
-        const response = await fetch("/api/workshop/inspection/photos", { method: "POST", body: form });
+        form.append("photos", file, file.name);
+        const response = await fetch("/api/workshop/inspection/photos", { method: "POST", body: form, cache: "no-store" });
         const data = await response.json() as { error?: string; photos?: Photo[] };
         if (!response.ok) throw new Error(data.error ?? "Upload foto non riuscito.");
-        currentPhotos = Array.isArray(data.photos) ? data.photos.slice(0, 4) : currentPhotos;
+        if (!Array.isArray(data.photos) || data.photos.length === 0) throw new Error("Foto caricata ma non salvata. Riprova.");
+        currentPhotos = data.photos.slice(-4);
         setPhotos(currentPhotos);
       }
       setMessage(`Foto caricate. ${currentPhotos.length}/4`);
