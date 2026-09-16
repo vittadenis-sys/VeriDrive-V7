@@ -73,8 +73,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "La prenotazione gratuita è disponibile solo presso Autogerma." }, { status: 400 });
     }
 
-    // Prevent booking the same workshop/date/time twice. Use the actual
-    // inspection_date stored by VeriDrive rather than legacy requested_* columns.
     const dayStart = `${date}T00:00:00`;
     const dayEnd = `${date}T23:59:59.999`;
     const { data: booked, error: bookedError } = await db
@@ -84,50 +82,59 @@ export async function POST(request: Request) {
       .gte("inspection_date", dayStart)
       .lte("inspection_date", dayEnd)
       .in("status", ACTIVE_BOOKING_STATUSES);
-
     if (bookedError) return NextResponse.json({ error: bookedError.message }, { status: 400 });
 
     const conflict = (booked ?? []).some((booking) => {
       if (!booking.inspection_date || !slot) return false;
       return String(booking.inspection_date).slice(11, 16) === slot;
     });
-
-    if (conflict) {
-      return NextResponse.json(
-        { error: "Lo slot selezionato non è più disponibile. Scegli un altro orario." },
-        { status: 409 }
-      );
-    }
+    if (conflict) return NextResponse.json({ error: "Lo slot selezionato non è più disponibile. Scegli un altro orario." }, { status: 409 });
   }
 
   const wantsFreeBooking = requestedFreeBooking && Boolean(workshop) && workshop!.name.toLowerCase().includes("autogerma");
 
   if (wantsFreeBooking) {
-    const { data: bonus, error: bonusError } = await db
-      .from("customer_bonus")
-      .select("free_bookings")
-      .eq("customer_id", customer.id)
-      .maybeSingle();
+    const { data: bonus, error: bonusError } = await db.from("customer_bonus").select("free_bookings").eq("customer_id", customer.id).maybeSingle();
     if (bonusError) return NextResponse.json({ error: "Impossibile verificare il bonus gratuito." }, { status: 500 });
-
     const freeBookings = Number(bonus?.free_bookings ?? 0);
     if (freeBookings < 1) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita non è più disponibile." }, { status: 409 });
-
-    const { data: updatedBonus, error: updateBonusError } = await db
-      .from("customer_bonus")
-      .update({ free_bookings: freeBookings - 1, updated_at: new Date().toISOString() })
-      .eq("customer_id", customer.id)
-      .eq("free_bookings", freeBookings)
-      .select("free_bookings")
-      .maybeSingle();
+    const { data: updatedBonus, error: updateBonusError } = await db.from("customer_bonus").update({ free_bookings: freeBookings - 1, updated_at: new Date().toISOString() }).eq("customer_id", customer.id).eq("free_bookings", freeBookings).select("free_bookings").maybeSingle();
     if (updateBonusError || !updatedBonus) return NextResponse.json({ error: "Il bonus per la prenotazione gratuita è stato usato da un'altra richiesta. Riprova." }, { status: 409 });
   }
 
   const inspectionDate = isOnline ? null : `${date}T${slot}:00`;
+  const referenceType = body.referenceType === "listing" ? "listing" : "plate";
+  const plate = String(body.plate ?? "").trim().toUpperCase();
+  const make = String(body.make ?? "").trim();
+  const model = String(body.model ?? "").trim();
+
+  let vehicleId: string | null = null;
+  if (referenceType === "plate" && plate) {
+    const { data: existingVehicle } = await db
+      .from("vehicles")
+      .select("id")
+      .eq("customer_id", customer.id)
+      .eq("plate", plate)
+      .maybeSingle();
+    if (existingVehicle?.id) {
+      const { error: vehicleUpdateError } = await db.from("vehicles").update({ plate, make: make || null, model: model || null }).eq("id", existingVehicle.id);
+      if (vehicleUpdateError) return NextResponse.json({ error: vehicleUpdateError.message }, { status: 400 });
+      vehicleId = existingVehicle.id;
+    } else {
+      const { data: createdVehicle, error: vehicleError } = await db.from("vehicles").insert({ customer_id: customer.id, plate, make: make || null, model: model || null }).select("id").single();
+      if (vehicleError) return NextResponse.json({ error: vehicleError.message }, { status: 400 });
+      vehicleId = createdVehicle.id;
+    }
+  } else if (make || model) {
+    const { data: createdVehicle, error: vehicleError } = await db.from("vehicles").insert({ customer_id: customer.id, plate: plate || null, make: make || null, model: model || null }).select("id").single();
+    if (vehicleError) return NextResponse.json({ error: vehicleError.message }, { status: 400 });
+    vehicleId = createdVehicle.id;
+  }
+
   const insertPayload = {
     customer_id: customer.id,
     workshop_id: workshop?.id ?? null,
-    vehicle_id: null,
+    vehicle_id: vehicleId,
     service: serviceKey,
     status: "requested",
     inspection_date: inspectionDate,
@@ -136,41 +143,14 @@ export async function POST(request: Request) {
     overall_notes: null,
   };
 
-  const { data, error } = await db
-    .from("bookings")
-    .insert(insertPayload)
-    .select("id,booking_code")
-    .single();
-
+  const { data, error } = await db.from("bookings").insert(insertPayload).select("id,booking_code").single();
   if (error) {
-    if (wantsFreeBooking) {
-      await db
-        .from("customer_bonus")
-        .update({ free_bookings: 1, updated_at: new Date().toISOString() })
-        .eq("customer_id", customer.id)
-        .eq("free_bookings", 0);
-    }
+    if (wantsFreeBooking) await db.from("customer_bonus").update({ free_bookings: 1, updated_at: new Date().toISOString() }).eq("customer_id", customer.id).eq("free_bookings", 0);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
   await sendBookingConfirmation(user.email ?? "", data.id);
-  await sendBookingOperationalNotifications({
-    id: data.id,
-    plate: "",
-    vehicleMake: null,
-    vehicleModel: null,
-    service: service.name,
-    customerEmail: user.email,
-    workshopEmail: workshop?.email ?? null,
-    date,
-    slot,
-    urgency,
-  });
+  await sendBookingOperationalNotifications({ id: data.id, plate, vehicleMake: make || null, vehicleModel: model || null, service: service.name, customerEmail: user.email, workshopEmail: workshop?.email ?? null, date, slot, urgency });
 
-  return NextResponse.json({
-    bookingId: data.id,
-    practiceNumber: data.booking_code ?? null,
-    service: service.key,
-    freeBooking: wantsFreeBooking,
-  });
+  return NextResponse.json({ bookingId: data.id, practiceNumber: data.booking_code ?? null, service: service.key, freeBooking: wantsFreeBooking });
 }
