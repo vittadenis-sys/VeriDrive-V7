@@ -16,6 +16,7 @@ type Booking = {
   status: string;
   inspection_date: string | null;
   total: number | null;
+  overall_notes?: string | null;
   vehicle?: Record<string, unknown> | null;
   customer?: { id: string; full_name: string | null; email: string | null; phone: string | null } | null;
 };
@@ -52,7 +53,14 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 function bookingSnapshot(booking: Booking) {
-  return typeof booking.vehicle === "object" && booking.vehicle ? booking.vehicle : null;
+  if (typeof booking.vehicle === "object" && booking.vehicle) return booking.vehicle;
+  if (typeof booking.overall_notes !== "string" || !booking.overall_notes.trim()) return null;
+  try {
+    const parsed = JSON.parse(booking.overall_notes);
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
 }
 
 function getStored(booking: Booking, ...keys: string[]) {
@@ -65,12 +73,10 @@ function getStored(booking: Booking, ...keys: string[]) {
 }
 
 function vehicleLabel(booking: Booking) {
-  const vehicle = bookingSnapshot(booking);
   const make = getStored(booking, "make", "vehicle_make", "brand", "marca");
   const model = getStored(booking, "model", "vehicle_model", "modello");
   const year = getStored(booking, "year", "vehicle_year", "anno");
-  if (make || model || year) return [make, model, year].filter(Boolean).join(" ");
-  return vehicle ? "Veicolo" : "Veicolo";
+  return [make, model, year].filter(Boolean).join(" ") || "Veicolo";
 }
 
 function vehiclePlate(booking: Booking) {
@@ -82,6 +88,7 @@ export default function Officina() {
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<"active" | "completed">("active");
 
   async function load() {
     setMessage("");
@@ -97,6 +104,12 @@ export default function Officina() {
 
   useEffect(() => { void load(); }, []);
 
+  const filteredBookings = useMemo(() => {
+    const bookings = data?.bookings ?? [];
+    if (activeFilter === "completed") return bookings.filter((booking) => ["completed", "cancelled", "refunded"].includes(booking.status));
+    return bookings.filter((booking) => !["completed", "cancelled", "refunded"].includes(booking.status));
+  }, [activeFilter, data]);
+
   const stats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const bookings = data?.bookings ?? [];
@@ -111,12 +124,7 @@ export default function Officina() {
     setBusyId(id);
     setMessage("");
     try {
-      const response = await fetch("/api/workshop/status", {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: id, toStatus }),
-      });
+      const response = await fetch("/api/workshop/status", { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId: id, toStatus }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Impossibile aggiornare la pratica.");
       await load();
@@ -133,93 +141,52 @@ export default function Officina() {
       <main className="page workshop-page">
         <div className="shell">
           <section className="workshop-hero-card">
-            <div className="workshop-title-copy">
-              <div className="eyebrow">Partner VeriDrive</div>
-              <h1>{data?.workshop?.name ? `Officina ${data.workshop.name}` : "Officina VeriDrive"}</h1>
-              <p>Dashboard operativa</p>
-            </div>
-            <div className="workshop-head-actions">
-              {data?.isSuperAdmin && <Link className="button secondary" href="/admin"><Shield size={18} /> Admin</Link>}
-              <button className="button" type="button" onClick={() => void load()}>Aggiorna</button>
-            </div>
+            <div className="workshop-title-copy"><div className="eyebrow">Partner VeriDrive</div><h1>{data?.workshop?.name ? `Officina ${data.workshop.name}` : "Officina VeriDrive"}</h1><p>Dashboard operativa</p></div>
+            <div className="workshop-head-actions">{data?.isSuperAdmin && <Link className="button secondary" href="/admin"><Shield size={18} /> Admin</Link>}<button className="button" type="button" onClick={() => void load()}>Aggiorna</button></div>
           </section>
 
           <nav className={`workshop-nav-bar ${styles.workshopMobileNav}`} aria-label="Navigazione officina">
-            {nav.map(([label, href, Icon]) => (
-              <Link key={`${label}-${href}`} href={href}>
-                <Icon size={19} />
-                <span>{label}</span>
-              </Link>
-            ))}
+            {nav.map(([label, href, Icon]) => <Link key={`${label}-${href}`} href={href}><Icon size={19} /><span>{label}</span></Link>)}
           </nav>
 
-          <section className="workshop-stats-section">
-            <div className="workshop-stats-grid">
-              {stats.map(({ label, value, icon: Icon }) => (
-                <article className="metric workshop-stat-card" key={label}>
-                  <div className="workshop-stat-label"><Icon size={20} /><span>{label}</span></div>
-                  <strong>{value}</strong>
-                </article>
-              ))}
-            </div>
-          </section>
+          <section className="workshop-stats-section"><div className="workshop-stats-grid">{stats.map(({ label, value, icon: Icon }) => <article className="metric workshop-stat-card" key={label}><div className="workshop-stat-label"><Icon size={20} /><span>{label}</span></div><strong>{value}</strong></article>)}</div></section>
 
           <section className="workshop-practices-section">
             <div className="panel workshop-practices-panel">
-              <div className="workshop-section-head">
-                <div>
-                  <div className="eyebrow">Pratiche</div>
-                  <h2>Elenco vetture</h2>
-                  <p>Solo pratiche assegnate a questa officina.</p>
-                </div>
-                <span className="badge">{data?.bookings.length ?? 0} pratiche</span>
+              <div className="workshop-section-head"><div><div className="eyebrow">Pratiche</div><h2>Elenco vetture</h2><p>Solo pratiche assegnate a questa officina.</p></div><span className="badge">{data?.bookings.length ?? 0} pratiche</span></div>
+              <div className={styles.workshopFilters} role="tablist" aria-label="Filtro pratiche">
+                <button type="button" className={activeFilter === "active" ? styles.workshopFilterActive : styles.workshopFilter} onClick={() => setActiveFilter("active")}>Attive</button>
+                <button type="button" className={activeFilter === "completed" ? styles.workshopFilterActive : styles.workshopFilter} onClick={() => setActiveFilter("completed")}>Concluse / Storico</button>
               </div>
               {message && <p className="notice workshop-message">{message}</p>}
               <div className="workshop-bookings">
-                {(data?.bookings ?? []).length === 0 && !message && <div className="notice">Nessuna pratica assegnata.</div>}
-                {(data?.bookings ?? []).map((booking) => {
+                {filteredBookings.length === 0 && !message && <div className="notice">Nessuna pratica in questa sezione.</div>}
+                {filteredBookings.map((booking) => {
                   const label = vehicleLabel(booking);
                   const plate = vehiclePlate(booking);
-                  return (
-                    <article className={`workshop-booking ${styles.workshopBooking}`} key={booking.id}>
-                      <div className="workshop-booking-main">
-                        <div className="workshop-booking-title">
-                          <strong>{label}</strong>
-                          <span className="badge">{SERVICE_NAMES[booking.service] ?? booking.service}</span>
-                        </div>
-                        <div className={styles.workshopVehicleDetails}>
-                          {plate && <span><strong>Targa:</strong> {plate}</span>}
-                        </div>
-                        <div className="workshop-booking-meta">
-                          {booking.booking_code ? `${booking.booking_code} · ` : ""}
-                          {booking.customer?.full_name || booking.customer?.email || "Cliente"} · {booking.inspection_date ? new Date(booking.inspection_date).toLocaleString("it-IT") : "Data da definire"}
-                        </div>
-                      </div>
-                      <div className="workshop-booking-actions">
-                        <span className="badge">{STATUS_LABELS[booking.status] ?? booking.status}</span>
-                        {booking.status === "requested" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={(e) => { e.preventDefault(); void changeStatus(booking.id, "confirmed"); }}>{busyId === booking.id ? "…" : "Conferma"}</button>}
-                        {booking.status === "assigned" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={(e) => { e.preventDefault(); void changeStatus(booking.id, "confirmed"); }}>{busyId === booking.id ? "…" : "Conferma"}</button>}
-                        {booking.status === "confirmed" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={(e) => { e.preventDefault(); void changeStatus(booking.id, "in_progress"); }}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
-                        {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "refunded" && <Link className="button" href={`/officina/checklist?booking=${booking.id}`}>Checklist</Link>}
-                        {booking.status === "completed" && <Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Rivedi</Link>}
-                        {booking.total != null && <span className="workshop-payout">€{Number(booking.total).toFixed(2).replace(".", ",")}</span>}
-                      </div>
-                    </article>
-                  );
+                  return <article className={`workshop-booking ${styles.workshopBooking}`} key={booking.id}>
+                    <div className="workshop-booking-main">
+                      <div className="workshop-booking-title"><strong>{label}</strong><span className="badge">{SERVICE_NAMES[booking.service] ?? booking.service}</span></div>
+                      <div className={styles.workshopVehicleDetails}>{plate && <span><strong>Targa:</strong> {plate}</span>}</div>
+                      <div className="workshop-booking-meta">{booking.booking_code ? `${booking.booking_code} · ` : ""}{booking.customer?.full_name || booking.customer?.email || "Cliente"} · {booking.inspection_date ? new Date(booking.inspection_date).toLocaleString("it-IT") : "Data da definire"}</div>
+                    </div>
+                    <div className="workshop-booking-actions">
+                      <span className="badge">{STATUS_LABELS[booking.status] ?? booking.status}</span>
+                      {(booking.status === "requested" || booking.status === "assigned") && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={(e) => { e.preventDefault(); void changeStatus(booking.id, "confirmed"); }}>{busyId === booking.id ? "…" : "Conferma"}</button>}
+                      {booking.status === "confirmed" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={(e) => { e.preventDefault(); void changeStatus(booking.id, "in_progress"); }}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
+                      {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "refunded" && <Link className="button" href={`/officina/checklist?booking=${booking.id}`}>Checklist</Link>}
+                      {booking.status === "completed" && <Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Rivedi</Link>}
+                      {booking.total != null && <span className="workshop-payout">€{Number(booking.total).toFixed(2).replace(".", ",")}</span>}
+                    </div>
+                  </article>;
                 })}
               </div>
             </div>
           </section>
 
           <section className="workshop-bottom">
-            <Link className={`card workshop-bottom-card ${styles.workshopBottomCard}`} href="/officina/calendario">
-              <Clock3 size={22} />
-              <div><h3>Disponibilità</h3><p>Imposta gli slot prenotabili, capacità giornaliera e chiusure.</p></div>
-            </Link>
-            <Link className={`card workshop-bottom-card ${styles.workshopBottomCard}`} href="/officina/guadagni">
-              <Euro size={22} />
-              <div><h3>Guadagni</h3><p>Vedi pratiche concluse e compensi ancora da liquidare.</p></div>
-            </Link>
+            <Link className={`card workshop-bottom-card ${styles.workshopBottomCard}`} href="/officina/calendario"><Clock3 size={22} /><div><h3>Disponibilità</h3><p>Imposta gli slot prenotabili, capacità giornaliera e chiusure.</p></div></Link>
+            <Link className={`card workshop-bottom-card ${styles.workshopBottomCard}`} href="/officina/guadagni"><Euro size={22} /><div><h3>Guadagni</h3><p>Vedi pratiche concluse e compensi ancora da liquidare.</p></div></Link>
           </section>
         </div>
       </main>

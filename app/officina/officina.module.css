@@ -14,7 +14,8 @@
   .workshopMobileNav a svg { flex:none; width:17px; height:17px; }
   .workshopBooking { margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--line); }
   .workshopBooking:last-child { margin-bottom:0; padding-bottom:0; border-bottom:0; }
-  .workshopBottomCard { width:100%; }
+  .workshopBottomCard { width:100%; max-width:100%; display:flex; box-sizing:border-box; padding:20px; align-items:flex-start; gap:14px; }
+  .workshopBottomCard > svg { flex:none; margin-top:2px; }
   .workshopBottomCard h3 { margin:0 0 5px; }
   .workshopBottomCard p { margin:0; }
 }

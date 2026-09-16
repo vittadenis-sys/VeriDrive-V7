@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
+function parseSnapshot(value: unknown): Record<string, unknown> {
+  if (typeof value === "object" && value) return value as Record<string, unknown>;
+  if (typeof value !== "string" || !value.trim()) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function GET() {
   try {
     const supabase = await createClient();
@@ -76,12 +87,25 @@ export async function GET() {
     const customerById = new Map((customers ?? []).map((customer) => [customer.id, customer]));
     const vehicleById = new Map((vehicles ?? []).map((vehicle) => [vehicle.id, vehicle]));
 
-    const enriched = (bookings ?? []).map((booking) => ({
-      ...booking,
-      customer: customerById.get(booking.customer_id) ?? null,
-      vehicle: booking.vehicle_id ? vehicleById.get(booking.vehicle_id) ?? null : null,
-      payout: null,
-    }));
+    const enriched = (bookings ?? []).map((booking) => {
+      const snapshot = parseSnapshot(booking.overall_notes);
+      const vehicle = booking.vehicle_id ? vehicleById.get(booking.vehicle_id) ?? null : null;
+      const normalizedVehicle = vehicle ?? {
+        id: null,
+        plate: snapshot.plate ?? null,
+        make: snapshot.vehicle_make ?? null,
+        model: snapshot.vehicle_model ?? null,
+        year: snapshot.vehicle_year ?? null,
+        vin: snapshot.vin ?? null,
+        mileage: snapshot.vehicle_mileage ?? null,
+      };
+      return {
+        ...booking,
+        customer: customerById.get(booking.customer_id) ?? null,
+        vehicle: normalizedVehicle,
+        payout: null,
+      };
+    });
 
     return NextResponse.json({
       workshop,
