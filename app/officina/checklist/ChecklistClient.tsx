@@ -26,7 +26,7 @@ export default function ChecklistClient({ bookingId }: Props) {
   const score = useMemo(() => calculateWeightedVeriscore(weightedResults), [weightedResults]);
   const completed = checklist.filter((item) => Boolean(values[item.id])).length;
   const hasVehicleIdentity = !isCertificateService || Boolean(vehicle.plate.trim() && vehicle.vin.trim() && vehicle.mileage.trim() && Number(vehicle.mileage) >= 0);
-  const canClose = completed === checklist.length && hasVehicleIdentity && (!isPlus || photos.length === 10);
+  const canClose = completed === checklist.length && hasVehicleIdentity && (!isPlus || photos.length === 4);
 
   useEffect(() => {
     let active = true;
@@ -64,7 +64,7 @@ export default function ChecklistClient({ bookingId }: Props) {
       try {
         const response = await fetch(`/api/workshop/inspection/photos?bookingId=${encodeURIComponent(bookingId)}`, { cache: "no-store" });
         const data = await response.json() as { photos?: Photo[]; error?: string };
-        if (active && response.ok) setPhotos(Array.isArray(data.photos) ? data.photos : []);
+        if (active && response.ok) setPhotos(Array.isArray(data.photos) ? data.photos.slice(0, 4) : []);
         else if (active && data.error) setMessage(data.error);
       } catch (error) {
         if (active) setMessage(error instanceof Error ? error.message : "Impossibile caricare le foto.");
@@ -80,8 +80,8 @@ export default function ChecklistClient({ bookingId }: Props) {
 
   async function uploadPhotos(files: FileList | null) {
     if (!files || files.length === 0 || !isPlus) return;
-    const remaining = Math.max(0, 10 - photos.length);
-    if (files.length > remaining) { setMessage(`La Verifica Plus richiede 10 foto. Puoi aggiungerne ancora ${remaining}.`); return; }
+    const remaining = Math.max(0, 4 - photos.length);
+    if (files.length > remaining) { setMessage(`La Verifica Plus consente massimo 4 foto. Puoi aggiungerne ancora ${remaining}.`); return; }
     setPhotoBusy(true); setMessage("");
     try {
       const form = new FormData();
@@ -90,14 +90,14 @@ export default function ChecklistClient({ bookingId }: Props) {
       const response = await fetch("/api/workshop/inspection/photos", { method: "POST", body: form });
       const data = await response.json() as { error?: string; photos?: Photo[] };
       if (!response.ok) throw new Error(data.error ?? "Upload foto non riuscito.");
-      setPhotos((current) => [...current, ...(data.photos ?? [])].slice(0, 10));
+      setPhotos((current) => [...current, ...(data.photos ?? [])].slice(0, 4));
     } catch (error) { setMessage(error instanceof Error ? error.message : "Upload foto non riuscito."); }
     finally { setPhotoBusy(false); }
   }
 
   async function saveInspection(close = false) {
     if (close && !canClose) {
-      if (isPlus && photos.length !== 10) setMessage(`La Verifica Plus richiede 10 foto: al momento ce ne sono ${photos.length}.`);
+      if (isPlus && photos.length !== 4) setMessage(`La Verifica Plus richiede 4 foto: al momento ce ne sono ${photos.length}.`);
       return;
     }
     setBusy(true); setMessage("");
@@ -124,7 +124,7 @@ export default function ChecklistClient({ bookingId }: Props) {
     <h1 style={{ fontSize: "clamp(34px, 6vw, 48px)" }}>Checklist tecnica</h1>
     <section className="panel" style={{ marginTop: 18 }}><div className="eyebrow">DATI VEICOLO</div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginTop: 12 }}><div><small>Targa</small><strong style={{ display: "block" }}>{vehicle.plate || "—"}</strong></div><div><small>Veicolo</small><strong style={{ display: "block" }}>{[vehicle.make, vehicle.model].filter(Boolean).join(" ") || "—"}</strong></div><div><small>Anno</small><strong style={{ display: "block" }}>{vehicle.year || "—"}</strong></div><div><small>Chilometri</small><strong style={{ display: "block" }}>{vehicle.mileage || "—"}</strong></div><div className="full"><small>VIN</small><strong style={{ display: "block", wordBreak: "break-all" }}>{vehicle.vin || "—"}</strong></div></div></section>
     {isCertificateService&&<section className="panel" style={{marginTop:18}}><div className="eyebrow">DATI VEICOLO · CERTIFICATO</div><h3>Conferma i dati prima della chiusura</h3><p style={{opacity:.75}}>Completa targa, telaio e chilometraggio prima di chiudere il certificato.</p><div className="form" style={{marginTop:12}}><label>Targa<input value={vehicle.plate} onChange={e=>setVehicle(v=>({...v,plate:e.target.value}))}/></label><label>Marca<input value={vehicle.make} onChange={e=>setVehicle(v=>({...v,make:e.target.value}))}/></label><label>Modello<input value={vehicle.model} onChange={e=>setVehicle(v=>({...v,model:e.target.value}))}/></label><label>Anno<input value={vehicle.year} inputMode="numeric" onChange={e=>setVehicle(v=>({...v,year:e.target.value}))}/></label><label className="full">Telaio / VIN<input value={vehicle.vin} onChange={e=>setVehicle(v=>({...v,vin:e.target.value.toUpperCase()}))} placeholder="Inserisci il VIN completo"/></label><label className="full">Chilometri<input value={vehicle.mileage} type="number" min="0" step="1" inputMode="numeric" onChange={e=>setVehicle(v=>({...v,mileage:e.target.value}))} placeholder="Es. 48230"/></label></div>{!hasVehicleIdentity&&<p className="notice" style={{marginTop:12}}>Per chiudere VeriScore o VeriScorePlus servono targa, VIN e chilometraggio.</p>}</section>}
-    {isPlus&&<section className="panel" style={{marginTop:18}}><div className="eyebrow">VERISCORE PLUS · 10 FOTO</div><h3>Documentazione fotografica</h3><p style={{opacity:.75}}>Carica esattamente 10 foto dell'auto: carrozzeria esterna e vano motore. Verranno associate al certificato Plus.</p><input type="file" accept="image/*" multiple disabled={photoBusy||photos.length>=10} onChange={e=>void uploadPhotos(e.target.files)}/><div style={{display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:8,marginTop:14}}>{Array.from({length:10}).map((_,index)=>{const photo=photos[index];return <div key={index} style={{aspectRatio:"4/3",borderRadius:8,overflow:"hidden",border:"1px solid #d8e2f2",background:"#f6f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>{photo?.preview_url?<img src={photo.preview_url} alt={`Foto ${index+1}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:12,opacity:.55}}>{index+1}</span>}</div>;})}</div><p style={{marginTop:10,marginBottom:0,fontWeight:700}}>{photos.length}/10 foto caricate.</p>{photoBusy&&<p className="notice" style={{marginTop:10}}>Caricamento foto…</p>}</section>}
+    {isPlus&&<section className="panel" style={{marginTop:18}}><div className="eyebrow">VERISCORE PLUS · 4 FOTO</div><h3>Documentazione fotografica</h3><p style={{opacity:.75}}>Carica esattamente 4 foto dell'auto. Verranno associate al certificato Plus.</p><input type="file" accept="image/*" multiple disabled={photoBusy||photos.length>=4} onChange={e=>{void uploadPhotos(e.target.files); e.currentTarget.value="";}}/><div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:8,marginTop:14}}>{Array.from({length:4}).map((_,index)=>{const photo=photos[index];return <div key={index} style={{aspectRatio:"4/3",borderRadius:8,overflow:"hidden",border:"1px solid #d8e2f2",background:"#f6f9ff",display:"flex",alignItems:"center",justifyContent:"center"}}>{photo?.preview_url?<img src={photo.preview_url} alt={`Foto ${index+1}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:12,opacity:.55}}>{index+1}</span>}</div>;})}</div><p style={{marginTop:10,marginBottom:0,fontWeight:700}}>{photos.length}/4 foto caricate.</p>{photoBusy&&<p className="notice" style={{marginTop:10}}>Caricamento foto…</p>}</section>}
     <div className="panel" style={{display:"flex",alignItems:"center",gap:18,flexWrap:"wrap",marginTop:18,marginBottom:24}}><VeriScore score={score} size={92}/><div><p style={{marginBottom:6}}><b>{score}/100</b></p><p style={{margin:0}}>{completed}/{checklist.length} controlli compilati</p></div></div>
     {loading&&<p className="notice" style={{marginTop:18}}>Caricamento della pratica…</p>}
     <div className="checklist" style={{marginTop:24}}>{checklist.map(item=><div className="check" key={item.id} style={{display:"block"}}><div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}><span style={{minWidth:220,flex:"1 1 260px"}}><small>{item.id}. {item.area}</small><br/><b>{item.label}</b></span><div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}><button type="button" className={`button ${values[item.id]==="ok"?"":"secondary"}`} onClick={()=>setResult(item.id,"ok")}>OK</button><button type="button" className={`button ${values[item.id]==="issue"?"":"secondary"}`} onClick={()=>setResult(item.id,"issue")}>Anomalia</button><button type="button" className={`button ${values[item.id]==="critical"?"":"secondary"}`} onClick={()=>setResult(item.id,"critical")}>Anomalia grave</button></div></div></div>)}</div>
