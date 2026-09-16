@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const MAX_SIDE = 1600;
-const JPEG_QUALITY = 0.82;
+const MAX_SIDE = 1200;
+const JPEG_QUALITY = 0.6;
 
 async function fileToOptimizedJpeg(file: File): Promise<File> {
   if (!file.type.startsWith("image/")) return file;
@@ -18,16 +18,36 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
 
     if (!image.naturalWidth || !image.naturalHeight) return file;
 
-    const scale = Math.min(1, MAX_SIDE / Math.max(image.naturalWidth, image.naturalHeight));
-    const width = Math.max(1, Math.round(image.naturalWidth * scale));
-    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    // iPhone/Android photos may store camera orientation in EXIF.
+    // createImageBitmap with from-image normalizes it before drawing.
+    let source: CanvasImageSource = image;
+    let sourceWidth = image.naturalWidth;
+    let sourceHeight = image.naturalHeight;
+    let bitmap: ImageBitmap | null = null;
+
+    if (typeof createImageBitmap === "function") {
+      try {
+        bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+        source = bitmap;
+        sourceWidth = bitmap.width;
+        sourceHeight = bitmap.height;
+      } catch {
+        // Safari/older browsers may not support the option; the decoded image is used as fallback.
+      }
+    }
+
+    const scale = Math.min(1, MAX_SIDE / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
 
     const context = canvas.getContext("2d");
     if (!context) return file;
-    context.drawImage(image, 0, 0, width, height);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(source, 0, 0, width, height);
 
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY),
