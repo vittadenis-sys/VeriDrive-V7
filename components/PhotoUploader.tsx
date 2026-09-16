@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const MAX_SIDE = 800;
-const JPEG_QUALITY = 0.4;
+const MAX_SIDE = 640;
+const JPEG_QUALITY = 0.35;
 const MAX_PHOTOS = 4;
 
 async function fileToOptimizedJpeg(file: File): Promise<File> {
@@ -30,7 +30,7 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
         sourceWidth = bitmap.width;
         sourceHeight = bitmap.height;
       } catch {
-        // Browser fallback.
+        // Safari/Image fallback below.
       }
     }
 
@@ -52,7 +52,7 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
     );
     if (!blob || blob.size === 0) return file;
 
-    const baseName = file.name.replace(/\.[^.]+$/, "");
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "foto";
     return new File([blob], `${baseName}.jpg`, {
       type: "image/jpeg",
       lastModified: Date.now(),
@@ -65,49 +65,50 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
 export function PhotoUploader() {
   const [message, setMessage] = useState("");
   const [photoCount, setPhotoCount] = useState(0);
+  const [busy, setBusy] = useState(false);
 
   async function upload(form: FormData) {
     if (!supabase) return setMessage("Configura Supabase.");
 
-    const inspectionId = String(form.get("inspection_id"));
+    const inspectionId = String(form.get("inspection_id") ?? "").trim();
     const file = form.get("photo") as File;
     if (!inspectionId || !file?.size) return setMessage("Inserisci l’ispezione e seleziona una foto.");
     if (photoCount >= MAX_PHOTOS) return setMessage("Massimo 4 foto per ispezione.");
 
+    setBusy(true);
     setMessage("Ottimizzazione foto…");
-    let optimized: File;
     try {
-      optimized = await fileToOptimizedJpeg(file);
-    } catch {
-      optimized = file;
+      const optimized = await fileToOptimizedJpeg(file);
+      const path = `${inspectionId}/${crypto.randomUUID()}-${optimized.name}`;
+      const { error: storageError } = await supabase.storage
+        .from("inspection-photos")
+        .upload(path, optimized, { contentType: "image/jpeg", upsert: false });
+      if (storageError) return setMessage(storageError.message);
+
+      const { error } = await supabase.from("photos").insert({
+        inspection_id: inspectionId,
+        storage_path: path,
+        caption: form.get("caption"),
+        check_id: Number(form.get("check_id")) || null,
+      });
+      if (error) return setMessage(error.message);
+
+      setPhotoCount((count) => count + 1);
+      setMessage(`Foto caricata. ${photoCount + 1}/${MAX_PHOTOS}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Upload foto non riuscito.");
+    } finally {
+      setBusy(false);
     }
-
-    const path = `${inspectionId}/${crypto.randomUUID()}-${optimized.name}`;
-    const { error: storageError } = await supabase.storage
-      .from("inspection-photos")
-      .upload(path, optimized, { contentType: "image/jpeg", upsert: false });
-
-    if (storageError) return setMessage(storageError.message);
-
-    const { error } = await supabase.from("photos").insert({
-      inspection_id: inspectionId,
-      storage_path: path,
-      caption: form.get("caption"),
-      check_id: Number(form.get("check_id")) || null,
-    });
-
-    if (error) return setMessage(error.message);
-    setPhotoCount((count) => count + 1);
-    setMessage(`Foto caricata. ${photoCount + 1}/${MAX_PHOTOS}`);
   }
 
   return (
     <form action={upload} className="panel form">
-      <label>ID ispezione<input name="inspection_id" required /></label>
-      <label>Controllo (1–50)<input name="check_id" type="number" min="1" max="50" /></label>
-      <label className="full">Foto {photoCount}/{MAX_PHOTOS}<input name="photo" type="file" accept="image/*" capture="environment" required disabled={photoCount >= MAX_PHOTOS} /></label>
-      <label className="full">Didascalia<input name="caption" /></label>
-      <button className="button full" disabled={photoCount >= MAX_PHOTOS}>{photoCount >= MAX_PHOTOS ? "Massimo 4 foto raggiunto" : "Carica foto"}</button>
+      <label>ID ispezione<input name="inspection_id" required disabled={busy} /></label>
+      <label>Controllo (1–50)<input name="check_id" type="number" min="1" max="50" disabled={busy} /></label>
+      <label className="full">Foto {photoCount}/{MAX_PHOTOS}<input name="photo" type="file" accept="image/*" capture="environment" required disabled={busy || photoCount >= MAX_PHOTOS} /></label>
+      <label className="full">Didascalia<input name="caption" disabled={busy} /></label>
+      <button className="button full" disabled={busy || photoCount >= MAX_PHOTOS}>{busy ? "Caricamento…" : photoCount >= MAX_PHOTOS ? "Massimo 4 foto raggiunto" : "Carica foto"}</button>
       {message && <p className="notice full">{message}</p>}
     </form>
   );
