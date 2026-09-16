@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const MAX_SIDE = 1000;
-const JPEG_QUALITY = 0.5;
+const MAX_SIDE = 800;
+const JPEG_QUALITY = 0.4;
+const MAX_PHOTOS = 4;
 
 async function fileToOptimizedJpeg(file: File): Promise<File> {
   if (!file.type.startsWith("image/")) return file;
@@ -29,7 +30,7 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
         sourceWidth = bitmap.width;
         sourceHeight = bitmap.height;
       } catch {
-        // Keep the browser-decoded image as fallback.
+        // Browser fallback.
       }
     }
 
@@ -39,19 +40,12 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
-
     const context = canvas.getContext("2d");
     if (!context) return file;
     context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-
-    if (bitmap) {
-      context.drawImage(bitmap, 0, 0, width, height);
-      bitmap.close();
-    } else {
-      // Modern Safari applies EXIF orientation when decoding the Image element.
-      context.drawImage(image, 0, 0, width, height);
-    }
+    context.imageSmoothingQuality = "medium";
+    context.drawImage(source, 0, 0, width, height);
+    bitmap?.close();
 
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY),
@@ -70,6 +64,7 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
 
 export function PhotoUploader() {
   const [message, setMessage] = useState("");
+  const [photoCount, setPhotoCount] = useState(0);
 
   async function upload(form: FormData) {
     if (!supabase) return setMessage("Configura Supabase.");
@@ -77,6 +72,7 @@ export function PhotoUploader() {
     const inspectionId = String(form.get("inspection_id"));
     const file = form.get("photo") as File;
     if (!inspectionId || !file?.size) return setMessage("Inserisci l’ispezione e seleziona una foto.");
+    if (photoCount >= MAX_PHOTOS) return setMessage("Massimo 4 foto per ispezione.");
 
     setMessage("Ottimizzazione foto…");
     let optimized: File;
@@ -100,16 +96,18 @@ export function PhotoUploader() {
       check_id: Number(form.get("check_id")) || null,
     });
 
-    setMessage(error ? error.message : "Foto caricata nella galleria.");
+    if (error) return setMessage(error.message);
+    setPhotoCount((count) => count + 1);
+    setMessage(`Foto caricata. ${photoCount + 1}/${MAX_PHOTOS}`);
   }
 
   return (
     <form action={upload} className="panel form">
       <label>ID ispezione<input name="inspection_id" required /></label>
       <label>Controllo (1–50)<input name="check_id" type="number" min="1" max="50" /></label>
-      <label className="full">Foto<input name="photo" type="file" accept="image/*" capture="environment" required /></label>
+      <label className="full">Foto {photoCount}/{MAX_PHOTOS}<input name="photo" type="file" accept="image/*" capture="environment" required disabled={photoCount >= MAX_PHOTOS} /></label>
       <label className="full">Didascalia<input name="caption" /></label>
-      <button className="button full">Carica foto</button>
+      <button className="button full" disabled={photoCount >= MAX_PHOTOS}>{photoCount >= MAX_PHOTOS ? "Massimo 4 foto raggiunto" : "Carica foto"}</button>
       {message && <p className="notice full">{message}</p>}
     </form>
   );
