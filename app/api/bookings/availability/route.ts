@@ -38,9 +38,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Data non valida." }, { status: 400 });
   }
 
+  // Availability is date-based. The booking itself enforces the exact 24/48h rule;
+  // availability should still return workshops for valid future dates.
   const requested = new Date(`${date}T12:00:00`);
-  const minAdvanceHours = urgency ? 24 : 48;
-  if (requested.getTime() - Date.now() < minAdvanceHours * 60 * 60 * 1000) {
+  const minimumDate = new Date();
+  minimumDate.setHours(0, 0, 0, 0);
+  const minimumAdvanceDate = new Date(minimumDate.getTime() + (urgency ? 24 : 48) * 60 * 60 * 1000);
+  if (requested.getTime() < minimumAdvanceDate.getTime()) {
     return NextResponse.json({
       error: urgency
         ? "L'urgenza richiede almeno 24 ore di preavviso."
