@@ -1,0 +1,20 @@
+/* Scoped only to the Officina dashboard. */
+.workshopMobileNav { width:100%; max-width:100%; overflow:hidden; min-width:0; }
+.workshopMobileNav a { min-width:0; overflow:hidden; }
+.workshopMobileNav a span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.workshopBooking { min-width:0; overflow:hidden; }
+.workshopVehicleDetails { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:8px; color:var(--muted); font-size:13px; }
+.workshopVehicleDetails span { min-width:0; }
+.workshopBottomCard { min-width:0; overflow:hidden; }
+.workshopBottomCard > div { min-width:0; }
+@media (max-width:760px) {
+  .workshopMobileNav { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; width:100%; }
+  .workshopMobileNav a { width:100%; justify-content:center; padding:10px 4px; gap:4px; }
+  .workshopMobileNav a span { display:block; max-width:100%; font-size:11px; }
+  .workshopMobileNav a svg { flex:none; width:17px; height:17px; }
+  .workshopBooking { margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--line); }
+  .workshopBooking:last-child { margin-bottom:0; padding-bottom:0; border-bottom:0; }
+  .workshopBottomCard { width:100%; }
+  .workshopBottomCard h3 { margin:0 0 5px; }
+  .workshopBottomCard p { margin:0; }
+}
