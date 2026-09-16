@@ -11,6 +11,17 @@ async function getWorkshop(db: ReturnType<typeof createServiceClient>, userId: s
   return data;
 }
 
+async function ensureStorageBucket(db: ReturnType<typeof createServiceClient>) {
+  const bucket = "inspection-photos";
+  const { data: buckets, error: listError } = await db.storage.listBuckets();
+  if (listError) throw listError;
+  const exists = (buckets ?? []).some((item) => item.id === bucket || item.name === bucket);
+  if (!exists) {
+    const { error } = await db.storage.createBucket(bucket, { public: false, fileSizeLimit: "8MB" });
+    if (error && !/already exists/i.test(error.message)) throw error;
+  }
+}
+
 async function resolveInspection(db: ReturnType<typeof createServiceClient>, bookingId: string, workshopId: string) {
   const { data: booking, error: bookingError } = await db.from("bookings").select("id,workshop_id,service").eq("id", bookingId).maybeSingle();
   if (bookingError || !booking || booking.workshop_id !== workshopId) return { error: "Pratica non trovata." as string | null };
@@ -25,13 +36,21 @@ async function resolveInspection(db: ReturnType<typeof createServiceClient>, boo
   return { inspectionId: inspection.id as string, error: null as string | null };
 }
 
+async function listPhotos(db: ReturnType<typeof createServiceClient>, inspectionId: string) {
+  const { data, error } = await db.from("photos")
+    .select("id,storage_path,caption,check_id,created_at")
+    .eq("inspection_id", inspectionId)
+    .order("created_at", { ascending: true })
+    .limit(MAX_PHOTOS);
+  if (error) throw error;
+  return (data ?? []) as Array<{ id: string; storage_path: string; caption: string | null; check_id: number | null; created_at: string }>;
+}
+
 async function signedPhotos(db: ReturnType<typeof createServiceClient>, photos: Array<{ id: string; storage_path: string; caption: string | null; check_id: number | null; created_at: string }>) {
-  const out = [];
-  for (const photo of photos.slice(0, MAX_PHOTOS)) {
-    const { data: signed } = await db.storage.from("inspection-photos").createSignedUrl(photo.storage_path, 600);
-    out.push({ ...photo, preview_url: signed?.signedUrl ?? null });
-  }
-  return out;
+  return Promise.all(photos.slice(0, MAX_PHOTOS).map(async (photo) => {
+    const { data: signed, error } = await db.storage.from("inspection-photos").createSignedUrl(photo.storage_path, 600);
+    return { ...photo, preview_url: error || !signed?.signedUrl ? null : signed.signedUrl };
+  }));
 }
 
 export async function GET(request: Request) {
@@ -44,14 +63,8 @@ export async function GET(request: Request) {
     if (!workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
     const resolved = await resolveInspection(db, bookingId, workshop.id);
     if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: 404 });
-
-    const { data, error } = await db.from("photos")
-      .select("id,storage_path,caption,check_id,created_at")
-      .eq("inspection_id", resolved.inspectionId)
-      .order("created_at", { ascending: true })
-      .limit(MAX_PHOTOS);
-    if (error) return NextResponse.json({ error: error.message, code: error.code, hint: error.hint }, { status: 500 });
-    return NextResponse.json({ photos: await signedPhotos(db, (data ?? []) as any) });
+    const photos = await listPhotos(db, resolved.inspectionId as string);
+    return NextResponse.json({ photos: await signedPhotos(db, photos) });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Errore interno." }, { status: 500 });
   }
@@ -71,42 +84,40 @@ export async function POST(request: Request) {
     if (!workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
     const resolved = await resolveInspection(db, bookingId, workshop.id);
     if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: 400 });
+    await ensureStorageBucket(db);
+
     const inspectionId = resolved.inspectionId as string;
-
-    const { data: existing, error: existingError } = await db.from("photos")
-      .select("id,storage_path,caption,check_id,created_at")
-      .eq("inspection_id", inspectionId)
-      .order("created_at", { ascending: true });
-    if (existingError) return NextResponse.json({ error: existingError.message, code: existingError.code, hint: existingError.hint }, { status: 500 });
-
-    const existingCount = existing?.length ?? 0;
-    if (existingCount >= MAX_PHOTOS) return NextResponse.json({ error: "Sono già presenti 4 foto per questa verifica." }, { status: 400 });
-    const room = MAX_PHOTOS - existingCount;
+    const existing = await listPhotos(db, inspectionId);
+    const room = MAX_PHOTOS - existing.length;
+    if (room <= 0) return NextResponse.json({ error: "Sono già presenti 4 foto per questa verifica." }, { status: 400 });
     if (files.length > room) return NextResponse.json({ error: `Puoi aggiungere ancora ${room} ${room === 1 ? "foto" : "foto"}. Massimo 4 foto.` }, { status: 400 });
 
-    for (const file of files) {
-      if (!file.type.startsWith("image/")) return NextResponse.json({ error: "Sono consentite solo immagini." }, { status: 400 });
-      if (file.size > MAX_UPLOAD_BYTES) return NextResponse.json({ error: "La foto è troppo grande. Riducila prima di caricarla." }, { status: 400 });
-      const storagePath = `${workshop.id}/${bookingId}/${crypto.randomUUID()}.jpg`;
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const { error: uploadError } = await db.storage.from("inspection-photos").upload(storagePath, bytes, {
-        contentType: "image/jpeg",
-        upsert: false,
-        cacheControl: "31536000",
-      });
-      if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
-      const { error: rowError } = await db.from("photos").insert({ inspection_id: inspectionId, storage_path: storagePath, caption: null, check_id: null });
-      if (rowError) return NextResponse.json({ error: rowError.message, code: rowError.code, hint: rowError.hint }, { status: 500 });
+    const createdPaths: string[] = [];
+    try {
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) return NextResponse.json({ error: "Sono consentite solo immagini." }, { status: 400 });
+        if (file.size > MAX_UPLOAD_BYTES) return NextResponse.json({ error: "La foto è troppo grande. Riducila prima di caricarla." }, { status: 400 });
+        const storagePath = `${workshop.id}/${bookingId}/${crypto.randomUUID()}.jpg`;
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const { error: uploadError } = await db.storage.from("inspection-photos").upload(storagePath, bytes, {
+          contentType: "image/jpeg",
+          upsert: false,
+          cacheControl: "31536000",
+        });
+        if (uploadError) throw uploadError;
+        createdPaths.push(storagePath);
+        const { error: rowError } = await db.from("photos").insert({ inspection_id: inspectionId, storage_path: storagePath, caption: null, check_id: null });
+        if (rowError) throw rowError;
+      }
+      const refreshed = await listPhotos(db, inspectionId);
+      return NextResponse.json({ photos: await signedPhotos(db, refreshed) });
+    } catch (error) {
+      if (createdPaths.length) {
+        await db.storage.from("inspection-photos").remove(createdPaths);
+        await db.from("photos").delete().eq("inspection_id", inspectionId).in("storage_path", createdPaths);
+      }
+      throw error;
     }
-
-    const { data: refreshed, error: refreshError } = await db.from("photos")
-      .select("id,storage_path,caption,check_id,created_at")
-      .eq("inspection_id", inspectionId)
-      .order("created_at", { ascending: true })
-      .limit(MAX_PHOTOS);
-    if (refreshError) return NextResponse.json({ error: refreshError.message, code: refreshError.code, hint: refreshError.hint }, { status: 500 });
-
-    return NextResponse.json({ photos: await signedPhotos(db, (refreshed ?? []) as any) });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Errore interno." }, { status: 500 });
   }
