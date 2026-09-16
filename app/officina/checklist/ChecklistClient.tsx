@@ -79,15 +79,14 @@ export default function ChecklistClient({ bookingId }: Props) {
   }
 
   async function uploadPhotos(files: FileList | null) {
-    if (!files || files.length === 0 || !isPlus) return;
+    if (!files || files.length === 0 || !isPlus || photoBusy) return;
     const remaining = Math.max(0, 4 - photos.length);
     const selected = Array.from(files).slice(0, remaining);
     if (selected.length === 0) { setMessage("Sono già presenti 4 foto."); return; }
-    if (files.length > remaining) { setMessage(`Puoi aggiungere ancora ${remaining} ${remaining === 1 ? "foto" : "foto"}. Massimo 4 foto.`); }
+    if (files.length > remaining) setMessage(`Puoi aggiungere ancora ${remaining} ${remaining === 1 ? "foto" : "foto"}. Massimo 4 foto.`);
     setPhotoBusy(true);
-    setMessage("");
     try {
-      let added: Photo[] = [];
+      let currentPhotos = photos;
       for (const file of selected) {
         const form = new FormData();
         form.set("bookingId", bookingId);
@@ -95,11 +94,10 @@ export default function ChecklistClient({ bookingId }: Props) {
         const response = await fetch("/api/workshop/inspection/photos", { method: "POST", body: form });
         const data = await response.json() as { error?: string; photos?: Photo[] };
         if (!response.ok) throw new Error(data.error ?? "Upload foto non riuscito.");
-        const latest = Array.isArray(data.photos) ? data.photos : [];
-        added = latest;
-        setPhotos(latest.slice(0, 4));
+        currentPhotos = Array.isArray(data.photos) ? data.photos.slice(0, 4) : currentPhotos;
+        setPhotos(currentPhotos);
       }
-      setMessage(`Foto caricate. ${Math.min(photos.length + selected.length, 4)}/4`);
+      setMessage(`Foto caricate. ${currentPhotos.length}/4`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload foto non riuscito.");
     } finally {
