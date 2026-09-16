@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, FileCheck2, LogIn, Plus, ShieldCheck, Download } from "lucide-react";
+import { CalendarDays, FileCheck2, Plus, ShieldCheck, Download } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
 const SERVICE_NAMES: Record<string, string> = {
-  check_viaggio: "Check Viaggio",
+  check_viaggio: "Check-up + Check Viaggio",
   veriscore: "Check-up + VeriScore",
   check_online: "Check Online",
   veriscore_plus: "Check-up + VeriScorePlus",
@@ -96,9 +96,7 @@ export default function Dashboard() {
     }
   }
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useEffect(() => { void load(); }, []);
 
   const stats = useMemo(() => {
     const bookings = data?.bookings ?? [];
@@ -136,9 +134,7 @@ export default function Dashboard() {
                 <h2>{message}</h2>
                 <p>La sessione è attiva, ma non è stato possibile caricare i dati cliente.</p>
               </div>
-              <button type="button" className="button" onClick={() => void load()} disabled={loading}>
-                {loading ? "Caricamento…" : "Riprova"}
-              </button>
+              <button type="button" className="button" onClick={() => void load()} disabled={loading}>{loading ? "Caricamento…" : "Riprova"}</button>
             </section>
           )}
 
@@ -155,76 +151,36 @@ export default function Dashboard() {
                   <div><div className="eyebrow">PRATICHE REALI</div><h2>Le tue verifiche</h2></div>
                   <button type="button" className="button secondary" onClick={() => void load()} disabled={loading}>Aggiorna</button>
                 </div>
-
                 {loading && <div className="notice">Caricamento pratiche…</div>}
-                {!loading && data && data.bookings.length === 0 && (
-                  <div className="panel customer-info">
-                    <div><h3>Nessuna verifica ancora</h3><p>Quando creerai la prima prenotazione comparirà qui con il suo stato.</p></div>
-                    <Link className="button" href="/prenota">Prenota ora</Link>
-                  </div>
-                )}
-                {!loading && data && data.bookings.length > 0 && (
-                  <div className="customer-checks">
-                    {data.bookings.map((booking) => {
-                      const vehicle = [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(" ") || "Veicolo";
-                      const certificate = certificatesByBooking.get(booking.id);
-                      return (
-                        <article className="customer-check" key={booking.id}>
-                          <div className="customer-check-main">
-                            <div className="vehicle-icon"><CalendarDays size={20} /></div>
-                            <div>
-                              <strong>{vehicle}</strong>
-                              <span>{booking.practice_code ?? "Pratica"}</span>
-                              <span>{booking.plate}</span>
-                              <span>{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>
-                              <span>{formatDate(booking.requested_date)} {booking.requested_slot ?? ""}</span>
-                              {certificate && <span style={{ marginTop: 4, fontWeight: 700 }}>Certificato {certificate.public_code} · VeriScore {certificate.veriscore}/100 · {formatIssuedAt(certificate.issued_at)}</span>}
-                            </div>
-                          </div>
-                          <div className="customer-check-score">
-                            <div className="small-score"><span>Stato</span><strong>{STATUS_LABELS[booking.status] ?? booking.status}</strong><em>{booking.urgency ? "Urgenza" : money(booking.customer_price_cents)}</em></div>
-                            {booking.status === "completed" && <Link className="button secondary" href={`/verifica/${certificate?.public_code ?? booking.id}`}>Apri pratica</Link>}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
+                {!loading && data && data.bookings.length === 0 && <div className="panel customer-info"><div><h3>Nessuna verifica ancora</h3><p>Quando creerai la prima prenotazione comparirà qui con il suo stato.</p></div><Link className="button" href="/prenota">Prenota ora</Link></div>}
+                {!loading && data && data.bookings.length > 0 && <div className="customer-checks">{data.bookings.map((booking) => {
+                  const vehicle = [booking.vehicle_make, booking.vehicle_model, booking.vehicle_year].filter((value) => value !== null && value !== undefined && String(value).trim() !== "").join(" ") || "Veicolo";
+                  const certificate = certificatesByBooking.get(booking.id);
+                  return <article className="customer-check" key={booking.id}>
+                    <div className="customer-check-main">
+                      <div className="vehicle-icon"><CalendarDays size={20} /></div>
+                      <div>
+                        <strong>{vehicle}</strong>
+                        <span>{booking.plate ? `Targa: ${booking.plate}` : "Targa non disponibile"}</span>
+                        <span>{booking.practice_code ?? "Pratica"}</span>
+                        <span>{SERVICE_NAMES[booking.service_key] ?? booking.service_key}</span>
+                        <span>{formatDate(booking.requested_date)} {booking.requested_slot ?? ""}</span>
+                        {certificate && <span style={{ marginTop: 4, fontWeight: 700 }}>Certificato {certificate.public_code} · VeriScore {certificate.veriscore}/100 · {formatIssuedAt(certificate.issued_at)}</span>}
+                      </div>
+                    </div>
+                    <div className="customer-check-score">
+                      <div className="small-score"><span>Stato</span><strong>{STATUS_LABELS[booking.status] ?? booking.status}</strong><em>{booking.urgency ? "Urgenza" : money(booking.customer_price_cents)}</em></div>
+                      {booking.status === "completed" && <Link className="button secondary" href={`/verifica/${certificate?.public_code ?? booking.id}`}>Apri pratica</Link>}
+                    </div>
+                  </article>;
+                })}</div>}
               </section>
 
               <section className="dashboard-section" style={{ marginTop: 12 }}>
-                <div className="section-heading">
-                  <div><div className="eyebrow">DOCUMENTI</div><h2>I miei certificati</h2></div>
-                </div>
+                <div className="section-heading"><div><div className="eyebrow">DOCUMENTI</div><h2>I miei certificati</h2></div></div>
                 {loading && <div className="notice">Caricamento certificati…</div>}
-                {!loading && (data?.certificates ?? []).length === 0 && (
-                  <div className="panel customer-info">
-                    <ShieldCheck size={28} />
-                    <div><h3>Nessun certificato ancora</h3><p>Quando una pratica VeriScore viene chiusa, il certificato apparirà automaticamente qui.</p></div>
-                  </div>
-                )}
-                {!loading && (data?.certificates ?? []).length > 0 && (
-                  <div className="customer-checks">
-                    {(data?.certificates ?? []).map((certificate) => (
-                      <article className="customer-check" key={certificate.id}>
-                        <div className="customer-check-main">
-                          <div className="vehicle-icon"><ShieldCheck size={20} /></div>
-                          <div>
-                            <strong>{[certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</strong>
-                            <span>Certificato {certificate.public_code}</span>
-                            <span>VeriScore {certificate.veriscore}/100 · {certificate.vehicle_mileage.toLocaleString("it-IT")} km</span>
-                            <span>Emesso il {formatIssuedAt(certificate.issued_at)}</span>
-                          </div>
-                        </div>
-                        <div className="customer-check-score">
-                          <div className="small-score"><span>Targa</span><strong>{certificate.vehicle_plate}</strong><em>VIN {certificate.vehicle_vin}</em></div>
-                          <Link className="button secondary" href={`/verifica/${certificate.public_code}`}><ShieldCheck size={17} /> Verifica</Link>
-                          <a className="button" href={`/api/customer/certificates/${encodeURIComponent(certificate.id)}/pdf`}><Download size={17} /> Scarica PDF</a>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
+                {!loading && (data?.certificates ?? []).length === 0 && <div className="panel customer-info"><ShieldCheck size={28} /><div><h3>Nessun certificato ancora</h3><p>Quando una pratica VeriScore viene chiusa, il certificato apparirà automaticamente qui.</p></div></div>}
+                {!loading && (data?.certificates ?? []).length > 0 && <div className="customer-checks">{(data?.certificates ?? []).map((certificate) => <article className="customer-check" key={certificate.id}><div className="customer-check-main"><div className="vehicle-icon"><ShieldCheck size={20} /></div><div><strong>{[certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</strong><span>Certificato {certificate.public_code}</span><span>VeriScore {certificate.veriscore}/100 · {certificate.vehicle_mileage.toLocaleString("it-IT")} km</span><span>Emesso il {formatIssuedAt(certificate.issued_at)}</span></div></div><div className="customer-check-score"><div className="small-score"><span>Targa</span><strong>{certificate.vehicle_plate}</strong><em>VIN {certificate.vehicle_vin}</em></div><Link className="button secondary" href={`/verifica/${certificate.public_code}`}><ShieldCheck size={17} /> Verifica</Link><a className="button" href={`/api/customer/certificates/${encodeURIComponent(certificate.id)}/pdf`}><Download size={17} /> Scarica PDF</a></div></article>)}</div>}
               </section>
 
               <section className="cards" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", padding: "10px 0 28px" }}>

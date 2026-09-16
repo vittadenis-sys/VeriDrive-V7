@@ -51,17 +51,30 @@ const STATUS_LABELS: Record<string, string> = {
   refunded: "Rimborsata",
 };
 
-function vehicleLabel(vehicle: Record<string, unknown> | null | undefined) {
-  if (!vehicle) return "Veicolo";
-  const make = vehicle.make ?? vehicle.vehicle_make ?? vehicle.brand ?? vehicle.marca;
-  const model = vehicle.model ?? vehicle.vehicle_model ?? vehicle.modello;
-  const year = vehicle.year ?? vehicle.vehicle_year ?? vehicle.anno;
-  return [make, model, year].filter(Boolean).join(" ") || "Veicolo";
+function bookingSnapshot(booking: Booking) {
+  return typeof booking.vehicle === "object" && booking.vehicle ? booking.vehicle : null;
 }
 
-function vehiclePlate(vehicle: Record<string, unknown> | null | undefined) {
-  if (!vehicle) return null;
-  const plate = vehicle.plate ?? vehicle.vehicle_plate ?? vehicle.license_plate ?? vehicle.targa;
+function getStored(booking: Booking, ...keys: string[]) {
+  const snapshot = bookingSnapshot(booking);
+  for (const key of keys) {
+    const value = snapshot?.[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") return value;
+  }
+  return null;
+}
+
+function vehicleLabel(booking: Booking) {
+  const vehicle = bookingSnapshot(booking);
+  const make = getStored(booking, "make", "vehicle_make", "brand", "marca");
+  const model = getStored(booking, "model", "vehicle_model", "modello");
+  const year = getStored(booking, "year", "vehicle_year", "anno");
+  if (make || model || year) return [make, model, year].filter(Boolean).join(" ");
+  return vehicle ? "Veicolo" : "Veicolo";
+}
+
+function vehiclePlate(booking: Booking) {
+  const plate = getStored(booking, "plate", "registration", "license_plate", "targa");
   return typeof plate === "string" && plate.trim() ? plate.trim().toUpperCase() : null;
 }
 
@@ -165,17 +178,17 @@ export default function Officina() {
               <div className="workshop-bookings">
                 {(data?.bookings ?? []).length === 0 && !message && <div className="notice">Nessuna pratica assegnata.</div>}
                 {(data?.bookings ?? []).map((booking) => {
-                  const plate = vehiclePlate(booking.vehicle);
+                  const label = vehicleLabel(booking);
+                  const plate = vehiclePlate(booking);
                   return (
                     <article className={`workshop-booking ${styles.workshopBooking}`} key={booking.id}>
                       <div className="workshop-booking-main">
                         <div className="workshop-booking-title">
-                          <strong>{vehicleLabel(booking.vehicle)}</strong>
+                          <strong>{label}</strong>
                           <span className="badge">{SERVICE_NAMES[booking.service] ?? booking.service}</span>
                         </div>
                         <div className={styles.workshopVehicleDetails}>
                           {plate && <span><strong>Targa:</strong> {plate}</span>}
-                          <span><strong>Vettura:</strong> {vehicleLabel(booking.vehicle)}</span>
                         </div>
                         <div className="workshop-booking-meta">
                           {booking.booking_code ? `${booking.booking_code} · ` : ""}
