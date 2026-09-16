@@ -81,18 +81,30 @@ export default function ChecklistClient({ bookingId }: Props) {
   async function uploadPhotos(files: FileList | null) {
     if (!files || files.length === 0 || !isPlus) return;
     const remaining = Math.max(0, 4 - photos.length);
-    if (files.length > remaining) { setMessage(`La Verifica Plus consente massimo 4 foto. Puoi aggiungerne ancora ${remaining}.`); return; }
-    setPhotoBusy(true); setMessage("");
+    const selected = Array.from(files).slice(0, remaining);
+    if (selected.length === 0) { setMessage("Sono già presenti 4 foto."); return; }
+    if (files.length > remaining) { setMessage(`Puoi aggiungere ancora ${remaining} ${remaining === 1 ? "foto" : "foto"}. Massimo 4 foto.`); }
+    setPhotoBusy(true);
+    setMessage("");
     try {
-      const form = new FormData();
-      form.set("bookingId", bookingId);
-      Array.from(files).forEach((file) => form.append("photos", file));
-      const response = await fetch("/api/workshop/inspection/photos", { method: "POST", body: form });
-      const data = await response.json() as { error?: string; photos?: Photo[] };
-      if (!response.ok) throw new Error(data.error ?? "Upload foto non riuscito.");
-      setPhotos((current) => [...current, ...(data.photos ?? [])].slice(0, 4));
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Upload foto non riuscito."); }
-    finally { setPhotoBusy(false); }
+      let added: Photo[] = [];
+      for (const file of selected) {
+        const form = new FormData();
+        form.set("bookingId", bookingId);
+        form.append("photos", file);
+        const response = await fetch("/api/workshop/inspection/photos", { method: "POST", body: form });
+        const data = await response.json() as { error?: string; photos?: Photo[] };
+        if (!response.ok) throw new Error(data.error ?? "Upload foto non riuscito.");
+        const latest = Array.isArray(data.photos) ? data.photos : [];
+        added = latest;
+        setPhotos(latest.slice(0, 4));
+      }
+      setMessage(`Foto caricate. ${Math.min(photos.length + selected.length, 4)}/4`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Upload foto non riuscito.");
+    } finally {
+      setPhotoBusy(false);
+    }
   }
 
   async function saveInspection(close = false) {
