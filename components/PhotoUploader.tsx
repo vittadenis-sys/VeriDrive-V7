@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const MAX_SIDE = 1200;
-const JPEG_QUALITY = 0.6;
+const MAX_SIDE = 1000;
+const JPEG_QUALITY = 0.5;
 
 async function fileToOptimizedJpeg(file: File): Promise<File> {
   if (!file.type.startsWith("image/")) return file;
@@ -15,11 +15,8 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
     image.decoding = "async";
     image.src = url;
     await image.decode();
-
     if (!image.naturalWidth || !image.naturalHeight) return file;
 
-    // iPhone/Android photos may store camera orientation in EXIF.
-    // createImageBitmap with from-image normalizes it before drawing.
     let source: CanvasImageSource = image;
     let sourceWidth = image.naturalWidth;
     let sourceHeight = image.naturalHeight;
@@ -32,7 +29,7 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
         sourceWidth = bitmap.width;
         sourceHeight = bitmap.height;
       } catch {
-        // Safari/older browsers may not support the option; the decoded image is used as fallback.
+        // Keep the browser-decoded image as fallback.
       }
     }
 
@@ -47,7 +44,14 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
     if (!context) return file;
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
-    context.drawImage(source, 0, 0, width, height);
+
+    if (bitmap) {
+      context.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close();
+    } else {
+      // Modern Safari applies EXIF orientation when decoding the Image element.
+      context.drawImage(image, 0, 0, width, height);
+    }
 
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY),
@@ -55,7 +59,10 @@ async function fileToOptimizedJpeg(file: File): Promise<File> {
     if (!blob || blob.size === 0) return file;
 
     const baseName = file.name.replace(/\.[^.]+$/, "");
-    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+    return new File([blob], `${baseName}.jpg`, {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
   } finally {
     URL.revokeObjectURL(url);
   }
