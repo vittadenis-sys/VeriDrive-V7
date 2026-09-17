@@ -67,13 +67,19 @@ export async function GET() {
     const vehicleIds = (bookings ?? [])
       .map((booking) => booking.vehicle_id)
       .filter((id): id is string => Boolean(id));
+    const bookingIds = (bookings ?? [])
+      .map((booking) => booking.id)
+      .filter((id): id is string => Boolean(id));
 
-    const [{ data: customers, error: customersError }, { data: vehicles, error: vehiclesError }] = await Promise.all([
+    const [{ data: customers, error: customersError }, { data: vehicles, error: vehiclesError }, { data: certificates, error: certificatesError }] = await Promise.all([
       customerIds.length
         ? db.from("customers").select("id,full_name,phone").in("id", customerIds)
         : Promise.resolve({ data: [], error: null }),
       vehicleIds.length
         ? db.from("vehicles").select("*").in("id", vehicleIds)
+        : Promise.resolve({ data: [], error: null }),
+      bookingIds.length
+        ? db.from("veriscore_certificates").select("id,booking_id,public_code").in("booking_id", bookingIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
 
@@ -83,9 +89,13 @@ export async function GET() {
     if (vehiclesError) {
       return NextResponse.json({ error: vehiclesError.message }, { status: 500 });
     }
+    if (certificatesError) {
+      return NextResponse.json({ error: certificatesError.message }, { status: 500 });
+    }
 
     const customerById = new Map((customers ?? []).map((customer) => [customer.id, customer]));
     const vehicleById = new Map((vehicles ?? []).map((vehicle) => [vehicle.id, vehicle]));
+    const certificateByBookingId = new Map((certificates ?? []).map((certificate) => [certificate.booking_id, certificate]));
 
     const enriched = (bookings ?? []).map((booking) => {
       const snapshot = parseSnapshot(booking.overall_notes);
@@ -99,10 +109,13 @@ export async function GET() {
         vin: snapshot.vin ?? null,
         mileage: snapshot.vehicle_mileage ?? null,
       };
+      const certificate = certificateByBookingId.get(booking.id) ?? null;
       return {
         ...booking,
         customer: customerById.get(booking.customer_id) ?? null,
         vehicle: normalizedVehicle,
+        certificate_id: certificate?.id ?? null,
+        certificate_code: certificate?.public_code ?? null,
         payout: null,
       };
     });
