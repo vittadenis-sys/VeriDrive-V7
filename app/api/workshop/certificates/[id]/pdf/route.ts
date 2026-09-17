@@ -12,24 +12,29 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     if (!user) return NextResponse.json({ error: "Accesso richiesto." }, { status: 401 });
 
     const db = createServiceClient();
-    const { data: workshop } = await db.from("workshops").select("id,name,city,postal_code,owner_auth_id").eq("owner_auth_id", user.id).maybeSingle();
-    if (!workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 403 });
+    const { data: admin } = await db.from("admins").select("role").eq("auth_id", user.id).maybeSingle();
+    const isAdmin = !!admin && ["admin", "super_admin"].includes(admin.role);
 
+    const { data: ownerWorkshop } = await db.from("workshops").select("id,name,city,postal_code,owner_auth_id").eq("owner_auth_id", user.id).maybeSingle();
     const { data: certificate, error: certificateError } = await db
       .from("veriscore_certificates")
       .select("id,booking_id,public_code,vehicle_plate,vehicle_vin,vehicle_make,vehicle_model,vehicle_year,vehicle_mileage,veriscore,workshop_id,issued_at")
       .eq("id", id)
-      .eq("workshop_id", workshop.id)
       .maybeSingle();
 
     if (certificateError) return NextResponse.json({ error: certificateError.message }, { status: 500 });
-    if (!certificate) return NextResponse.json({ error: "Certificato non associato all'officina." }, { status: 404 });
+    if (!certificate) return NextResponse.json({ error: "Certificato non trovato." }, { status: 404 });
 
+    const { data: certificateWorkshop } = await db.from("workshops").select("id,name,city,postal_code,owner_auth_id").eq("id", certificate.workshop_id).maybeSingle();
+    if (!certificateWorkshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
+
+    const canAccess = isAdmin || (ownerWorkshop?.id === certificateWorkshop.id);
+    if (!canAccess) return NextResponse.json({ error: "Certificato non associato all'officina." }, { status: 403 });
+
+    const workshop = certificateWorkshop;
     const { data: booking } = await db.from("bookings").select("id,customer_id,service,overall_notes").eq("id", certificate.booking_id).eq("workshop_id", workshop.id).maybeSingle();
     if (!booking) return NextResponse.json({ error: "Pratica non associata all'officina." }, { status: 404 });
 
-    // Il PDF viene generato con gli stessi dati certificati della rotta cliente.
-    // La sola differenza è l'autorizzazione: qui viene verificata l'officina proprietaria.
     const pdf = new jsPDF({ unit: "mm", format: "a4" });
     const W = pdf.internal.pageSize.getWidth();
     const H = pdf.internal.pageSize.getHeight();
