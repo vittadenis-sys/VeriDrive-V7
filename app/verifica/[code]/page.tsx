@@ -89,12 +89,12 @@ export default async function PublicCertificate({ params }: { params: Promise<{ 
     <main className="page">
       <div className="shell" style={{ maxWidth: 900 }}>
         <div className="eyebrow">VERIFICA CERTIFICATO VERIDRIVE</div>
-        <h1 style={{ fontSize: "clamp(38px, 6vw, 60px)", marginBottom: 8 }}>Verifica pubblica</h1>
+        <h1 style={{ fontSize: "clamp(38px, 6vw, 60px)", marginBottom: 12 }}>Verifica pubblica</h1>
         {!certificate ? (
-          <section className="panel customer-info" style={{ marginTop: 20 }}><XCircle size={30} /><div><h2>Certificato non trovato</h2><p>Il codice indicato non corrisponde a un certificato VeriScore pubblico.</p></div></section>
+          <section className="panel customer-info" style={{ marginTop: 12 }}><XCircle size={30} /><div><h2>Certificato non trovato</h2><p>Il codice indicato non corrisponde a un certificato VeriScore pubblico.</p></div></section>
         ) : (
           <>
-            <section className="panel customer-info" style={{ marginTop: 20, position: "relative", overflow: "hidden" }}>
+            <section className="panel customer-info" style={{ marginTop: 12, padding: 24, position: "relative", overflow: "hidden" }}>
               <div>
                 <CheckCircle2 size={34} />
                 <div className="eyebrow" style={{ marginTop: 8 }}>{isPlus ? "CERTIFICATO AUTENTICO · VERISCORE PLUS" : "CERTIFICATO AUTENTICO · VERISCORE"}</div>
@@ -111,12 +111,12 @@ export default async function PublicCertificate({ params }: { params: Promise<{ 
                 </svg>
               </div>}
             </section>
-            <section className="cards" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", marginTop: 16 }}><div className="metric"><span>Codice certificato</span><strong style={{ fontSize: 18 }}>{certificate.public_code}</strong></div><div className="metric"><span>Targa</span><strong>{certificate.vehicle_plate}</strong></div><div className="metric"><span>Telaio</span><strong style={{ fontSize: 16 }}>{certificate.vehicle_vin}</strong></div><div className="metric"><span>Km certificati</span><strong>{certificate.vehicle_mileage.toLocaleString("it-IT")}</strong></div></section>
-            <section className="panel" style={{ marginTop: 16 }}><h3>Dettagli della certificazione</h3><p style={{ marginBottom: 8 }}><b>Data verifica:</b> {formatDate(certificate.issued_at)}</p><p style={{ marginBottom: 0 }}><b>Officina:</b> {certificate.workshop_name ?? "Officina VeriDrive"}</p></section>
-            <section className="panel" style={{ marginTop: 16 }}><div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}><ShieldCheck size={24} /><p style={{ margin: 0 }}>La presente pagina verifica l'esistenza del certificato associato al codice indicato. I dati personali del proprietario non vengono pubblicati.</p></div></section>
+            <section className="cards" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", marginTop: 12 }}><div className="metric"><span>Codice certificato</span><strong style={{ fontSize: 18 }}>{certificate.public_code}</strong></div><div className="metric"><span>Targa</span><strong>{certificate.vehicle_plate}</strong></div><div className="metric"><span>Telaio</span><strong style={{ fontSize: 16 }}>{certificate.vehicle_vin}</strong></div><div className="metric"><span>Km certificati</span><strong>{certificate.vehicle_mileage.toLocaleString("it-IT")}</strong></div></section>
+            <section className="panel" style={{ marginTop: 12 }}><h3>Dettagli della certificazione</h3><p style={{ marginBottom: 8 }}><b>Data verifica:</b> {formatDate(certificate.issued_at)}</p><p style={{ marginBottom: 0 }}><b>Officina:</b> {certificate.workshop_name ?? "Officina VeriDrive"}</p></section>
+            <section className="panel" style={{ marginTop: 12 }}><div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}><ShieldCheck size={24} /><p style={{ margin: 0 }}>La presente pagina verifica l'esistenza del certificato associato al codice indicato. I dati personali del proprietario non vengono pubblicati.</p></div></section>
           </>
         )}
-        <div style={{ marginTop: 20 }}><Link href="/verifica" className="button secondary">Verifica un altro certificato</Link></div>
+        <div style={{ marginTop: 16 }}><Link href="/verifica" className="button secondary">Verifica un altro certificato</Link></div>
       </div>
     </main>
     <Footer />
