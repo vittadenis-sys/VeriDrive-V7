@@ -178,7 +178,7 @@ export default function Officina() {
                       {booking.status === "confirmed" && <button type="button" className="button secondary" disabled={busyId === booking.id} onClick={(e) => { e.preventDefault(); void changeStatus(booking.id, "in_progress"); }}>{busyId === booking.id ? "…" : "Inizia verifica"}</button>}
                       {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "refunded" && <Link className="button" href={`/officina/checklist?booking=${booking.id}`}>Checklist</Link>}
                       {booking.status === "completed" && <Link className="button secondary" href={`/officina/checklist?booking=${booking.id}`}>Rivedi</Link>}
-                      {booking.status === "completed" && booking.certificate_id && <Link className="button" href={`/api/workshop/certificates/${encodeURIComponent(booking.certificate_id)}/pdf`}><Download size={17} /> PDF</Link>}
+                      {booking.status === "completed" && booking.certificate_id && <Link className="button" href={`/api/customer/certificates/${encodeURIComponent(booking.certificate_id)}/pdf`}><Download size={17} /> PDF</Link>}
                       {booking.total != null && <span className="workshop-payout">€{Number(booking.total).toFixed(2).replace(".", ",")}</span>}
                     </div>
                   </article>;
