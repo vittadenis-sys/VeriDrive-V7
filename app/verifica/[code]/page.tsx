@@ -97,11 +97,11 @@ export default async function PublicCertificate({ params }: { params: Promise<{ 
             <section className="panel customer-info" style={{ marginTop: 20, position: "relative", overflow: "hidden" }}>
               <div>
                 <CheckCircle2 size={34} />
-                <div className="eyebrow" style={{ marginTop: 12 }}>{isPlus ? "CERTIFICATO AUTENTICO · VERISCORE PLUS" : "CERTIFICATO AUTENTICO · VERISCORE"}</div>
-                <h2>{[certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</h2>
+                <div className="eyebrow" style={{ marginTop: 8 }}>{isPlus ? "CERTIFICATO AUTENTICO · VERISCORE PLUS" : "CERTIFICATO AUTENTICO · VERISCORE"}</div>
+                <h2 style={{ marginBottom: 6 }}>{[certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</h2>
                 <p style={{ marginBottom: 0 }}>{certificate.vehicle_year ?? "Anno non indicato"} · {certificate.workshop_name ?? "Officina VeriDrive"}</p>
               </div>
-              {score && <div style={{ marginTop: 22, display: "flex", justifyContent: "center" }} aria-label={`VeriScore ${Math.round(Number(certificate.veriscore) || 0)} su 100`}>
+              {score && <div style={{ marginTop: 14, display: "flex", justifyContent: "center" }} aria-label={`VeriScore ${Math.round(Number(certificate.veriscore) || 0)} su 100`}>
                 <svg width="150" height="150" viewBox="0 0 140 140" role="img" aria-hidden="true">
                   <circle cx="70" cy="70" r={score.radius} fill="none" stroke="#DCE8FA" strokeWidth="10" />
                   <circle cx="70" cy="70" r={score.radius} fill="none" stroke={score.color} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${score.dash} ${score.circumference - score.dash}`} transform="rotate(-90 70 70)" />
