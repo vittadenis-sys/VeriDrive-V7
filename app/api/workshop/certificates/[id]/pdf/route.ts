@@ -27,16 +27,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
     const { data: workshop } = await db.from("workshops").select("id,name").eq("id", certificate.workshop_id).maybeSingle();
     if (!workshop) return NextResponse.json({ error: "Officina non associata." }, { status: 404 });
+    if (!isAdmin && ownerWorkshop?.id !== workshop.id) return NextResponse.json({ error: "Certificato non associato all'officina." }, { status: 403 });
 
-    if (!isAdmin && ownerWorkshop?.id !== workshop.id) {
-      return NextResponse.json({ error: "Certificato non associato all'officina." }, { status: 403 });
-    }
-
-    const { data: booking } = await db.from("bookings")
-      .select("id,customer_id,service,overall_notes")
-      .eq("id", certificate.booking_id)
-      .eq("workshop_id", workshop.id)
-      .maybeSingle();
+    const { data: booking } = await db.from("bookings").select("id,customer_id,service,overall_notes").eq("id", certificate.booking_id).eq("workshop_id", workshop.id).maybeSingle();
     if (!booking) return NextResponse.json({ error: "Pratica non associata all'officina." }, { status: 404 });
 
     const pdf = new jsPDF({ unit: "mm", format: "a4" });
@@ -103,14 +96,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     pdf.text("Verifica pubblica", W - 43, H - 30, { align: "center" });
 
     const buffer = pdf.output("arraybuffer");
-    return new NextResponse(buffer, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="VeriDrive-${code}.pdf"`,
-        "Cache-Control": "no-store",
-      },
-    });
+    return new NextResponse(buffer, { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="VeriDrive-${code}.pdf"`, "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("WORKSHOP_CERTIFICATE_PDF_ERROR", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Errore interno." }, { status: 500 });
