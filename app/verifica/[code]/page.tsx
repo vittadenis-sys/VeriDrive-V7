@@ -63,10 +63,26 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(value));
 }
 
+function scoreColor(score: number) {
+  if (score < 50) return "#DC2626";
+  if (score < 70) return "#F59E0B";
+  if (score < 85) return "#2563EB";
+  return "#16A34A";
+}
+
+function scoreCircle(score: number) {
+  const radius = 50;
+  const circumference = 2 * Math.PI * radius;
+  const safeScore = Math.max(0, Math.min(100, Number(score) || 0));
+  const dash = (safeScore / 100) * circumference;
+  return { radius, circumference, dash, color: scoreColor(safeScore) };
+}
+
 export default async function PublicCertificate({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const certificate = await getCertificate(code);
   const isPlus = Boolean(certificate?.is_plus);
+  const score = certificate ? scoreCircle(Number(certificate.veriscore)) : null;
 
   return <>
     <Header />
@@ -78,9 +94,22 @@ export default async function PublicCertificate({ params }: { params: Promise<{ 
           <section className="panel customer-info" style={{ marginTop: 28 }}><XCircle size={30} /><div><h2>Certificato non trovato</h2><p>Il codice indicato non corrisponde a un certificato VeriScore pubblico.</p></div></section>
         ) : (
           <>
-            <section className="panel customer-info" style={{ marginTop: 28 }}>
-              <div><CheckCircle2 size={34} /><div className="eyebrow" style={{ marginTop: 14 }}>{isPlus ? "CERTIFICATO AUTENTICO · VERISCORE PLUS" : "CERTIFICATO AUTENTICO · VERISCORE"}</div><h2>{[certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</h2><p>{certificate.vehicle_year ?? "Anno non indicato"} · {certificate.workshop_name ?? "Officina VeriDrive"}</p></div>
-              <div style={{ textAlign: "right" }}><span className="badge">{certificate.veriscore}/100</span><p style={{ marginBottom: 0, fontSize: 13, opacity: .75 }}>VeriScore</p></div>
+            <section className="panel customer-info" style={{ marginTop: 28, position: "relative", overflow: "hidden" }}>
+              <div>
+                <CheckCircle2 size={34} />
+                <div className="eyebrow" style={{ marginTop: 14 }}>{isPlus ? "CERTIFICATO AUTENTICO · VERISCORE PLUS" : "CERTIFICATO AUTENTICO · VERISCORE"}</div>
+                <h2>{[certificate.vehicle_make, certificate.vehicle_model].filter(Boolean).join(" ") || "Veicolo"}</h2>
+                <p>{certificate.vehicle_year ?? "Anno non indicato"} · {certificate.workshop_name ?? "Officina VeriDrive"}</p>
+              </div>
+              {score && <div style={{ marginTop: 28, display: "flex", justifyContent: "center" }} aria-label={`VeriScore ${score.dash ? Math.round((score.dash / score.circumference) * 100) : 0} su 100`}>
+                <svg width="150" height="150" viewBox="0 0 140 140" role="img" aria-hidden="true">
+                  <circle cx="70" cy="70" r={score.radius} fill="none" stroke="#DCE8FA" strokeWidth="10" />
+                  <circle cx="70" cy="70" r={score.radius} fill="none" stroke={score.color} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${score.dash} ${score.circumference - score.dash}`} transform="rotate(-90 70 70)" />
+                  <text x="70" y="67" textAnchor="middle" fontSize="27" fontWeight="700" fill="#0F172A">{Math.round(Number(certificate.veriscore) || 0)}</text>
+                  <text x="70" y="84" textAnchor="middle" fontSize="11" fill="#64748B">/100</text>
+                  <text x="70" y="101" textAnchor="middle" fontSize="11" fill="#64748B">VeriScore</text>
+                </svg>
+              </div>}
             </section>
             <section className="cards" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", marginTop: 18 }}><div className="metric"><span>Codice certificato</span><strong style={{ fontSize: 18 }}>{certificate.public_code}</strong></div><div className="metric"><span>Targa</span><strong>{certificate.vehicle_plate}</strong></div><div className="metric"><span>Telaio</span><strong style={{ fontSize: 16 }}>{certificate.vehicle_vin}</strong></div><div className="metric"><span>Km certificati</span><strong>{certificate.vehicle_mileage.toLocaleString("it-IT")}</strong></div></section>
             <section className="panel" style={{ marginTop: 18 }}><h3>Dettagli della certificazione</h3><p style={{ marginBottom: 8 }}><b>Data verifica:</b> {formatDate(certificate.issued_at)}</p><p style={{ marginBottom: 0 }}><b>Officina:</b> {certificate.workshop_name ?? "Officina VeriDrive"}</p></section>
