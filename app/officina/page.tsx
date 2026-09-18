@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ClipboardList, Euro, Home, UserRound, Clock3, Shield, Download } from "lucide-react";
+import { CalendarDays, ClipboardList, Euro, Home, UserRound, Clock3, Shield, Download, Zap } from "lucide-react";
 import { Header } from "@/components/Header";
 import styles from "./officina.module.css";
 
@@ -91,6 +91,9 @@ export default function Officina() {
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<"active" | "completed">("active");
+  const [instantOpen, setInstantOpen] = useState(false);
+  const [instantBusy, setInstantBusy] = useState(false);
+  const [instantMessage, setInstantMessage] = useState("");
 
   async function load() {
     setMessage("");
@@ -105,6 +108,39 @@ export default function Officina() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  const canInstantBook = data?.isSuperAdmin === true && data?.workshop?.name?.toLowerCase().includes("autogerma");
+
+  async function submitInstantBooking(form: FormData) {
+    setInstantBusy(true);
+    setInstantMessage("");
+    try {
+      const response = await fetch("/api/workshop/instant-booking", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerEmail: String(form.get("customerEmail") ?? "").trim(),
+          service: String(form.get("service") ?? "").trim(),
+          plate: String(form.get("plate") ?? "").trim(),
+          make: String(form.get("make") ?? "").trim(),
+          model: String(form.get("model") ?? "").trim(),
+          location: String(form.get("location") ?? "").trim(),
+          date: String(form.get("date") ?? "").trim(),
+          time: String(form.get("time") ?? "").trim(),
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Impossibile creare la prenotazione istantanea.");
+      setInstantMessage(payload.customerCreated ? `Prenotazione ${payload.practiceNumber ?? payload.bookingId} creata. Account cliente creato e email inviata.` : `Prenotazione ${payload.practiceNumber ?? payload.bookingId} creata.`);
+      setInstantOpen(false);
+      await load();
+    } catch (error) {
+      setInstantMessage(error instanceof Error ? error.message : "Impossibile creare la prenotazione istantanea.");
+    } finally {
+      setInstantBusy(false);
+    }
+  }
 
   const filteredBookings = useMemo(() => {
     const bookings = data?.bookings ?? [];
@@ -152,6 +188,29 @@ export default function Officina() {
           </nav>
 
           <section className="workshop-stats-section"><div className="workshop-stats-grid">{stats.map(({ label, value, icon: Icon }) => <article className="metric workshop-stat-card" key={label}><div className="workshop-stat-label"><Icon size={20} /><span>{label}</span></div><strong>{value}</strong></article>)}</div></section>
+
+          {canInstantBook && <div className={styles.instantBookingBar}>
+            <button type="button" className="button" onClick={() => { setInstantMessage(""); setInstantOpen(true); }}><Zap size={18} /> Prenotazione istantanea</button>
+            {instantMessage && <p className="notice" style={{ margin: 0 }}>{instantMessage}</p>}
+          </div>}
+
+          {instantOpen && canInstantBook && <div className={styles.instantOverlay} role="dialog" aria-modal="true" aria-label="Prenotazione istantanea">
+            <form className={styles.instantModal} action={submitInstantBooking}>
+              <div className={styles.instantModalHead}><div><div className="eyebrow">AUTOGERMA</div><h2>Prenotazione istantanea</h2><p>La pratica viene creata direttamente in officina e parte come confermata.</p></div><button type="button" className="button secondary" onClick={() => setInstantOpen(false)}>Chiudi</button></div>
+              <div className="form">
+                <label className="full">Email cliente <span style={{ opacity: .7 }}>(facoltativa)</span><input name="customerEmail" type="email" placeholder="lascia vuoto per admin@veridrive.it" /></label>
+                <label>Servizio<select name="service" defaultValue="veriscore"><option value="check_viaggio">Check Viaggio</option><option value="veriscore">Check-up + VeriScore</option><option value="veriscore_plus">Check-up + VeriScorePlus</option></select></label>
+                <label>Targa<input name="plate" required placeholder="AB123CD" autoCapitalize="characters" /></label>
+                <label>Marca <span style={{ opacity: .7 }}>(facoltativa)</span><input name="make" placeholder="Es. Volkswagen" /></label>
+                <label>Modello <span style={{ opacity: .7 }}>(facoltativo)</span><input name="model" placeholder="Es. Golf 1.5 TSI" /></label>
+                <label className="full">Dove si trova l'auto?<input name="location" defaultValue={data?.workshop?.address ?? ""} placeholder="Indirizzo, CAP o città" /></label>
+                <label>Data<input name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /></label>
+                <label>Ora<input name="time" type="time" defaultValue={new Date().toTimeString().slice(0, 5)} required /></label>
+              </div>
+              {instantMessage && <p className="notice">{instantMessage}</p>}
+              <div className={styles.instantModalActions}><button type="button" className="button secondary" onClick={() => setInstantOpen(false)}>Annulla</button><button type="submit" className="button" disabled={instantBusy}>{instantBusy ? "Creazione…" : "Crea prenotazione gratuita"}</button></div>
+            </form>
+          </div>}
 
           <section className="workshop-practices-section">
             <div className="panel workshop-practices-panel">
