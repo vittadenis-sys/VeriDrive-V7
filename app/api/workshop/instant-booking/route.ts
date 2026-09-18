@@ -144,8 +144,8 @@ export async function POST(request: Request) {
         await db.auth.resetPasswordForEmail(customerEmailInput, {
           redirectTo: `${baseUrl}/auth/callback?next=/dashboard`,
         });
-      } catch {
-        // The account remains usable through the normal recovery flow.
+      } catch (resetError) {
+        console.error("WORKSHOP_INSTANT_BOOKING_RESET_EMAIL_ERROR", resetError);
       }
     }
 
