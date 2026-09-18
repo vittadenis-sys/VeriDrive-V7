@@ -200,7 +200,7 @@ export default function Dashboard() {
                     <div className={`${styles.customerDashboardCertificateActions} customer-check-score`}>
                       <div className="small-score"><span>Targa</span><strong>{certificate.vehicle_plate}</strong><em>VIN {certificate.vehicle_vin}</em></div>
                       <Link className="button secondary" href={`/verifica/${certificate.public_code}`}><ShieldCheck size={17} /> Verifica</Link>
-                      <a className="button" href={`/api/customer/certificates/${encodeURIComponent(certificate.id)}/pdf?download=1`} download={`VeriDrive-${certificate.public_code}.pdf`}><Download size={17} /> Scarica PDF</a>
+                      <button type="button" className="button" onClick={async () => { try { const response = await fetch(`/api/customer/certificates/${encodeURIComponent(certificate.id)}/pdf?download=1`, { credentials: "include" }); if (!response.ok) throw new Error("Impossibile scaricare il PDF."); const blob = await response.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `VeriDrive-${certificate.public_code}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (error) { setMessage(error instanceof Error ? error.message : "Impossibile scaricare il PDF."); } }}><Download size={17} /> Scarica PDF</button>
                     </div>
                   </article>)}</div>}
                 </section>
