@@ -23,3 +23,21 @@
   .workshopBottomCard h3 { margin:0 0 5px; }
   .workshopBottomCard p { margin:0; }
 }
+
+.instantBookingBar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:0 0 20px; }
+.instantOverlay { position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(16,36,58,.48); }
+.instantModal { width:min(760px,100%); max-height:calc(100vh - 40px); overflow:auto; background:#fff; border:1px solid var(--line); border-radius:22px; padding:24px; box-shadow:0 28px 80px rgba(16,36,58,.24); }
+.instantModalHead { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:20px; }
+.instantModalHead h2 { margin:8px 0 8px; }
+.instantModalHead p { margin:0; color:var(--muted); }
+.instantModalActions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+@media (max-width:760px) {
+  .instantBookingBar { margin-bottom:18px; }
+  .instantBookingBar .button { width:100%; }
+  .instantOverlay { padding:12px; align-items:flex-end; }
+  .instantModal { max-height:calc(100vh - 24px); border-radius:20px; padding:18px; }
+  .instantModalHead { flex-direction:column; }
+  .instantModalHead > .button { width:100%; }
+  .instantModalActions { flex-direction:column-reverse; }
+  .instantModalActions .button { width:100%; }
+}
