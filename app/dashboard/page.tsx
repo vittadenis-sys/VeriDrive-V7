@@ -200,7 +200,7 @@ export default function Dashboard() {
                     <div className={`${styles.customerDashboardCertificateActions} customer-check-score`}>
                       <div className="small-score"><span>Targa</span><strong>{certificate.vehicle_plate}</strong><em>VIN {certificate.vehicle_vin}</em></div>
                       <Link className="button secondary" href={`/verifica/${certificate.public_code}`}><ShieldCheck size={17} /> Verifica</Link>
-                      <a className="button" href={`/api/customer/certificates/${encodeURIComponent(certificate.id)}/pdf`}><Download size={17} /> Scarica PDF</a>
+                      <a className="button" href={`/api/customer/certificates/${encodeURIComponent(certificate.id)}/pdf?download=1`}><Download size={17} /> Scarica PDF</a>
                     </div>
                   </article>)}</div>}
                 </section>
